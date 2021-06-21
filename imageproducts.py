@@ -1,6 +1,7 @@
 import numpy as np
+from corefuncs import Rectifier
 
-class ImageStats():
+class ImageStats(Rectifier):
     """
     This function generates statistical image products for a given set of 
     images and corresponding extrinsics/intrinsics. The statistical image
@@ -10,7 +11,6 @@ class ImageStats():
     or local coordinates. This can function can be used for a collection with
     variable (UAS)  and fixed intrinsics in addition to single/multi camera
     capability.
-
 
     Args:
         oblique images and extrinsics solutions
@@ -25,9 +25,9 @@ class ImageStats():
         metadata
 
     """
-    def __init__(self, rectifier_object, save_flag=0):
+    def __init__(self, rect, save_flag=0):
 
-        self.rect = rectifier_object
+        Rectifier.__init__(self, rect.xlims, rect.ylims, rect.dx, rect.z, rect.coords, rect.origin, rect.mType)
         self.save_flag = save_flag
 
         self.ims = []
@@ -58,7 +58,7 @@ class ImageStats():
             
             # Perform Statistical Calcutions
 
-            # Timex: Sum Values, will divide by total number at last frame.
+            # Timex: Sum Values, will divide by total number at last frame
             iTimex[:,:,j] = image 
             
             # Darkest: Compare New to Old value, save only the mimumum intensity

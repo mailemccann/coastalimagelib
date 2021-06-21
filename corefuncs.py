@@ -330,7 +330,7 @@ class Rectifier(object):
 
         return M.astype(np.uint8)
 
-    def mergeRectify(self, images, intrinsic_list, extrinsic_list):
+    def mergeRectify(self, images, intrinsic_list, extrinsic_list, xyz=None):
 
         """
         This function performs image rectifications on one frame given the associated
@@ -356,6 +356,7 @@ class Rectifier(object):
             images (list OR ndarray): 1xK list of paths to image files for each camera, OR NxMxK struct of images 
             intrinsic_list (list): 1x11xK internal calibration data for each camera
             extrinsic_list (list): 1x6xK external calibration data for each camera
+            xyz (ndarray): 3xN array if desired pixels are from different points than the main XYZ grid 
             
         Returns:
             Ir (ndarray): Image intensities at xyz points (georectified image)
