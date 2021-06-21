@@ -11,42 +11,69 @@ class ImageStats():
     """
     This function generates statistical image products for a given set of 
     images and corresponding extrinsics/intrinsics. The statistical image
-    products are the timex, brightest, variance, darkest. If specified,
-    rectified imagery for each image/frame can be produced and saved as an
-    png file. Rectified images and image products can be produced in world
-    or local coordinates if specified in the grid provided by
-    D_gridGenExampleRect. This can function can be used for a collection with
+    products are the timex, brightest, variance, darkest. 
+    
+    Rectified images and image products can be produced in world
+    or local coordinates. This can function can be used for a collection with
     variable (UAS)  and fixed intrinsics in addition to single/multi camera
     capability.
 
 
-    %  Input:
-    oblique images and extrinsics solutions calculated by
-    
-    rectification grid information
+    Args:
+        oblique images and extrinsics solutions
+        rectification grid information
+        save_flag
 
-    % Output:
-    % 5 Image Products  as well as individual rectified frames if desired saved
-    % as pngs. The accompanying metadata will be saved along with grid
-    % information in a mat file in the same ouputdirectory as the images. If
-    % multi-camera data is selected, the rectified individual frames will share
-    % the same name as the fist cam.    
+    Attributes:
+        brightest
+        darkest
+        timex
+        variance
+        metadata
 
     """
-    def __init__(self, xlims, ylims, dx=1, z=0, coords = 'local', origin = 'None', mType = 'CIRN'):
+    def __init__(self, rectifier_object, save_flag=0):
 
-        # Make XYZ grid
-        self.X, self.Y = np.meshgrid(np.arange(xlims[0], xlims[1]+dx, dx), 
-                                     np.arange(ylims[0], ylims[1]+dx, dx)
-                                     )
-        self.Z = np.zeros_like(self.X) + z
-        x = self.X.copy().T.flatten()
-        y = self.Y.copy().T.flatten()
-        z = self.Z.copy().T.flatten()
-        self.xyz = np.vstack((x, y, z)).T
+        self.rect = rectifier_object
+        self.save_flag = save_flag
 
-        # Init other params
-        self.coords = coords
-        self.origin = origin
-        self.mType = mType
-        self.s = self.X.shape
+        self.ims = []
+        self.num_images = 0
+
+    def addImage(self,Im):
+
+        self.ims.append(Im)
+        self.num_images +=1
+
+    def saveProducts(self):
+        dummy = 0
+
+    def dispProducts(self):
+        dummy = 0
+
+    def calcStats(self):
+
+        for j in self.num_images:
+            image = self.ims[j]
+             
+            # Initiate Image Product variables  
+            if j==0:
+                self.s = image.shape
+                iDark = np.ones((self.s[0], self.s[1]))*255 # Can't initialize as zero, will always be dark
+                iTimex = np.zeros((self.s[0], self.s[1], self.num_images))
+                iBright = np.zeros((self.s[0], self.s[1]))
+            
+            # Perform Statistical Calcutions
+
+            # Timex: Sum Values, will divide by total number at last frame.
+            iTimex[:,:,j] = image 
+            
+            # Darkest: Compare New to Old value, save only the mimumum intensity
+            iDark = np.nanmin(np.concatenate((iDark,image),axis=2),axis=2) 
+            
+            # Brightest: Compare New to Old value, save only the maximum intensity
+            iBright = np.nanmax(np.concatenate((iBright,image),axis=2),axis=2) 
+            
+        self.iDark = iDark
+        self.iBright = iBright
+        self.iTimex = np.uint8(np.nanmean(iTimex, axis=2)) 
