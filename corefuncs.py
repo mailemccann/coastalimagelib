@@ -42,23 +42,42 @@ class Rectifier(object):
         mType (string): format of intrinsic matrix, 'CIRN' is default, 'DLT' is also supported
 
     """
-    def __init__(self, xlims, ylims, dx=1, z=0, coords = 'local', origin = 'None', mType = 'CIRN'):
+    def __init__(self, xlims, ylims, dx=1, dy=1, z=0, coords = 'local', origin = 'None', mType = 'CIRN'):
 
-        # Make XYZ grid
-        self.X, self.Y = np.meshgrid(np.arange(xlims[0], xlims[1]+dx, dx), 
-                                     np.arange(ylims[0], ylims[1]+dx, dx)
-                                     )
-        self.Z = np.zeros_like(self.X) + z
-        x = self.X.copy().T.flatten()
-        y = self.Y.copy().T.flatten()
-        z = self.Z.copy().T.flatten()
-        self.xyz = np.vstack((x, y, z)).T
+        self.initXYZ(xlims, ylims, dx, dy, z)
+        print(self.xyz)
 
         # Init other params
         self.coords = coords
         self.origin = origin
         self.mType = mType
         self.s = self.X.shape
+    
+    def initXYZ(self, xlims, ylims, dx, dy, z):
+        '''
+        Function to initialize the XYZ grid
+
+        xlims and ylims can either be an array of two numbers, 
+        or one value if a 1D transect is desired
+        '''
+
+        if len(xlims)<2:
+            xvec = xlims
+        else:
+            xvec = np.arange(xlims[0], xlims[1]+dx, dx)
+
+        if len(ylims)<2:
+            yvec = ylims
+        else:
+            yvec = np.arange(ylims[0], ylims[1]+dy, dy)
+
+        # Make XYZ grid
+        self.X, self.Y = np.meshgrid(xvec, yvec)
+        self.Z = np.zeros_like(self.X) + z
+        x = self.X.copy().T.flatten()
+        y = self.Y.copy().T.flatten()
+        z = self.Z.copy().T.flatten()
+        self.xyz = np.vstack((x, y, z)).T
 
     def xyz2DistUV(self):
         '''
@@ -330,11 +349,11 @@ class Rectifier(object):
 
         return M.astype(np.uint8)
 
-    def mergeRectify(self, images, intrinsic_list, extrinsic_list, xyz=None):
+    def mergeRectify(self, cameras_frames, intrinsic_list, extrinsic_list):
 
         """
-        This function performs image rectifications on one frame given the associated
-        extrinsics, intrinsics, distorted images, and XYZ grid. 
+        This function performs image rectifications at one timestamp given the associated
+        extrinsics, intrinsics, and distorted images corresponding to each camera. 
         The function utilizes matchHist to match images from each camera
         to the same histogram, then calls xyz2DistUV or dlt2UV to find corresponding 
         UVd values to the input grid and pulls the rgb pixel intensity for 
@@ -349,11 +368,11 @@ class Rectifier(object):
         supported format is DLT), user can flag mType = 'DLT'.
 
         The function calls cameraSeamBlend as a last step to merge the values.
-
-        Note, all K cameras will share the same grid.
  
         Inputs:
-            images (list OR ndarray): 1xK list of paths to image files for each camera, OR NxMxK struct of images 
+            cameras_images (list OR ndarray): 1xK list of paths to image files for each camera, 
+                            OR NxMxK struct of images, one image per camera at the desired timestamp
+                            for rectification
             intrinsic_list (list): 1x11xK internal calibration data for each camera
             extrinsic_list (list): 1x6xK external calibration data for each camera
             xyz (ndarray): 3xN array if desired pixels are from different points than the main XYZ grid 
@@ -367,7 +386,7 @@ class Rectifier(object):
         IrIndv = np.zeros((self.s[0], self.s[1], self.numcams))
 
         # Iterate through each camera from to produce single merged frame
-        for k, (I, intrinsics, extrinsics) in enumerate(zip(images, intrinsic_list, extrinsic_list)):
+        for k, (I, intrinsics, extrinsics) in enumerate(zip(cameras_frames, intrinsic_list, extrinsic_list)):
 
             # Load individual camera intrinsics, extrinsics, and camera matrices
             self.calib = CameraData(intrinsics, extrinsics, self.origin, self.coords, self.mType)
@@ -377,7 +396,7 @@ class Rectifier(object):
                 # Load image from current camera
                 image = imageio.imread(I)
             else: 
-                image = images[:,:,k]
+                image = cameras_frames[:,:,k]
             
             # Match histograms
             if k==0: 
@@ -405,7 +424,7 @@ class Rectifier(object):
         Ir = self.cameraSeamBlend(IrIndv)
 
         # Return merged frame
-        return np.flipud(Ir)
+        return np.flipud(Ir.astype(np.uint8))
 
     def rectVideos(self, video_list, intrinsic_list, extrinsic_list, numFrames):
         
@@ -419,7 +438,7 @@ class Rectifier(object):
             extrinsic_list (list): 1x6xK external calibration data for each camera
             
         Returns:
-            None, saves .avi file to drive
+            rect_array: h x w x numFrames array of rectified frames
 
         """
 
@@ -448,12 +467,19 @@ class Rectifier(object):
                 self.outFile = initFullFileName(video_list[0],'video_capture.rect',type='avi')
                 result = cv.VideoWriter(self.outFile,cv.VideoWriter_fourcc('M','J','P','G'),
                                         1, (merged.shape[1],merged.shape[0]),0)
+                # Initialize array of images
+                self.rect_arr = np.empty((merged.shape[0],merged.shape[1],numFrames))
 
             # Write to drive
             result.write(merged.astype(np.uint8))
-            
+
+            # Add to image array
+            self.rect_arr[:,:,i] = merged.astype(np.uint8)
+
         print('Rectified .avi movie saved to working directory as: ' + self.outFile)
         result.release()
+
+        return self.rect_arr
 
 class CameraData(object):
     ''' 

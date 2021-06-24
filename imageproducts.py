@@ -1,72 +1,79 @@
 import numpy as np
-from corefuncs import Rectifier
+import cv2 as cv
+import sys
 
-class ImageStats(Rectifier):
+class ImageStats():
     """
-    This function generates statistical image products for a given set of 
-    images and corresponding extrinsics/intrinsics. The statistical image
-    products are the timex, brightest, variance, darkest. 
-    
-    Rectified images and image products can be produced in world
-    or local coordinates. This can function can be used for a collection with
-    variable (UAS)  and fixed intrinsics in addition to single/multi camera
-    capability.
+    This class takes in rectified images as arguments in addImage() 
+    then calculates and saves statistical image products such as 
+    time- exposure, variance, brightest pixels, and darkest pixels.
 
-    Args:
-        oblique images and extrinsics solutions
-        rectification grid information
-        save_flag
+    All images must be in black and white, and must all have the
+    same dimensions.  
 
     Attributes:
-        brightest
-        darkest
-        timex
-        variance
-        metadata
+        iBright: brightest pixels at each location across the 
+                collection
+        iDark: darkest pixels at each location across the collection
+        iTimex: time- exposure (mean) of all pixels at each location
+                across the collection
+        iVariance: standard deviation of all pixels at each location
+                across the collection
 
     """
-    def __init__(self, rect, save_flag=0):
-
-        Rectifier.__init__(self, rect.xlims, rect.ylims, rect.dx, rect.z, rect.coords, rect.origin, rect.mType)
-        self.save_flag = save_flag
-
-        self.ims = []
-        self.num_images = 0
+    def __init__(self, images):
+        self.calc_flag = 0
+        self.im_mat = images
 
     def addImage(self,Im):
-
-        self.ims.append(Im)
-        self.num_images +=1
+        self.im_mat = np.dstack((self.im_mat,Im))
 
     def saveProducts(self):
-        dummy = 0
+        '''
+        Function to save all image products
+
+        Can only be called after calc stats has run
+        '''
+        if self.calc_flag:
+            cv.imwrite('Darkest.jpg', self.Dark)
+            cv.imwrite('Brightest.jpg', self.Bright)
+            cv.imwrite('Timex.jpg', self.Timex)
+            cv.imwrite('Variance.jpg', self.Variance)
+            cv.waitKey(0) 
+
+        else: sys.exit('calcStats() must be called before products can be saved.')
 
     def dispProducts(self):
-        dummy = 0
+        '''
+        Function to display all image products
 
-    def calcStats(self):
+        Can only be called after calc stats has run
+        '''
 
-        for j in self.num_images:
-            image = self.ims[j]
-             
-            # Initiate Image Product variables  
-            if j==0:
-                self.s = image.shape
-                iDark = np.ones((self.s[0], self.s[1]))*255 # Can't initialize as zero, will always be dark
-                iTimex = np.zeros((self.s[0], self.s[1], self.num_images))
-                iBright = np.zeros((self.s[0], self.s[1]))
-            
-            # Perform Statistical Calcutions
+        if self.calc_flag:
+            cv.imshow('Darkest', self.Dark)
+            cv.imshow('Brightest', self.Bright)
+            cv.imshow('Timex', self.Timex)
+            cv.imshow('Variance', self.Variance)
+            cv.waitKey(0) 
 
-            # Timex: Sum Values, will divide by total number at last frame
-            iTimex[:,:,j] = image 
-            
-            # Darkest: Compare New to Old value, save only the mimumum intensity
-            iDark = np.nanmin(np.concatenate((iDark,image),axis=2),axis=2) 
-            
-            # Brightest: Compare New to Old value, save only the maximum intensity
-            iBright = np.nanmax(np.concatenate((iBright,image),axis=2),axis=2) 
-            
-        self.iDark = iDark
-        self.iBright = iBright
-        self.iTimex = np.uint8(np.nanmean(iTimex, axis=2)) 
+        else: sys.exit('calcStats() must be called before products can be displayed.')
+
+    def calcStats(self, save_flag=0):
+        '''
+        This function generates statistical image products for a given set of 
+        images and corresponding extrinsics/intrinsics. The statistical image
+        products are the timex, brightest, variance, darkest. 
+
+        Args:
+            save_flag: flag to indicate if products should be saved
+                    automatically to the user's drive
+
+        '''
+
+        self.calc_flag = 1
+        self.Dark = np.uint8(np.nanmin(self.im_mat,axis=2))
+        self.Bright = np.uint8(np.nanmax(self.im_mat,axis=2))
+        self.Timex = np.uint8(np.nanmean(self.im_mat, axis=2)) 
+        self.Variance = np.uint8(np.nanstd(self.im_mat, axis=2))
+        if save_flag: self.saveProducts()

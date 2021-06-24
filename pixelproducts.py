@@ -4,14 +4,15 @@ from scipy.interpolate import RegularGridInterpolator as reg_interp
 from corefuncs import Rectifier
 
 
-class PixelInsts(Rectifier):
+class PixelStack(Rectifier):
 
     '''
     Class that contains pixel instruments for use in bathymetric inversion,
-    surface current, or run-up calculations. Instruments can be made in
-    both world and a local rotated coordinate system. However, for ease and
-    accuracy, if planned to use in bathymetric inversion, surface current,
-    or run-up applications, it should occur in local coordinates.
+    surface current, run-up calculations, or other quantitative analyses. 
+    Instruments can be made in both world and a local rotated coordinate
+    system. However, for ease and accuracy, if planned to use in bathymetric
+    inversion, surface current, or run-up applications, it should occur
+    in local coordinates.
 
     Args:
         images and extrinsics/intrinsics calculated by
@@ -26,46 +27,44 @@ class PixelInsts(Rectifier):
 
     '''   
 
-    def __init__(self, rect, save_flag=0):
+    def __init__(self, xlims, ylims, dx=1, dy=1, z=0, coords = 'local', origin = 'None', mType = 'CIRN'):
 
-        Rectifier.__init__(self, rect.xlims, rect.ylims, rect.dx, rect.z, rect.coords, rect.origin, rect.mType)
-        self.save_flag = save_flag
+        Rectifier.__init__(self, xlims, ylims, dx, dy, z, coords, origin, mType)
 
-        self.ims = []
-        self.num_images = 0
-
-    def createInstruments(self,grids):        
+    def getTimestack(self, im_mat, intrinsic_list, extrinsic_list, sample_rate=1):        
         '''
-        This function generates pixel instruments for a given set of images and
+        This function generates pixel instruments (timestacks) for a given set of images and
+        corresponding extrinsics/intrinsics. 
+
+        '''  
+        '''
+        # Loop for Collecting Pixel Instrument Data.
+        num_frames = im_mat.shape[3]
+
+        for j in range(0,num_frames,sample_rate):
+            images = im_mat[:,:,:,j]
+            print(images.shape)
+        '''
+        merged = self.mergeRectify(im_mat, intrinsic_list, extrinsic_list)
+        cv.imwrite('testgrid.jpg',merged.astype(np.uint8))
+
+    def getTimestackFromMovie(self, im_mat, intrinsic_list, extrinsic_list, sample_rate=1):        
+        '''
+        This function generates pixel instruments (timestacks) for a given set of images and
         corresponding extrinsics/intrinsics. 
 
         '''  
 
         # Loop for Collecting Pixel Instrument Data.
-        I = []
+        num_frames = im_mat.shape[3]
+
+        for j in range(0,num_frames,sample_rate):
+            images = im_mat[:,:,:,j]
+            Ir = self.mergeRectify(images, intrinsic_list, extrinsic_list)
+            cv.imshow('test',Ir.astype(np.uint8))
+
         '''
-        for j in self.num_images:
-            
-            # For Each Camera
-            for k in len(self.cams):
-                # Load Image
-                I[k] = 1 # Add image!!
-            
-            #  Loop for Each Pixel Instrument
-            for p in grids:
-                
-                # Check if a time varying Z was specified. If not, wil just use constant Z
-                # Add this functionality
-                
-                #Pull Correct Extrinsics out, Corresponding In time
-                for k=1:camnum
-                    extrinsics{k}=Extrinsics{k}(j,:) 
-                
-                intrinsics=Intrinsics 
-                
-                # Pull RGB Pixel Intensities
-                [Ir]= mergeRectify(I,intrinsics,extrinsics,p.X,p.Y,p.Z,0)
-                
+             
                 
                 # If not First frame, tack on as last dimension (time).
                 if j~=1
@@ -85,7 +84,7 @@ class PixelInsts(Rectifier):
                     if nDim==1
                         pixInst(p).Irgb=cat(2,pixInst(p).Irgb,Irgb) 
         '''
-
+'''
 class pixGrid(PixelInsts):
 
     #  Example Grid
@@ -102,7 +101,7 @@ class pixGrid(PixelInsts):
                         np.arange(ylim[0], ylim[1]+dx, dy))
         Z = np.zeros_like(X) + z
 
-class vBarGrid(PixelInsts):
+class (PixelInsts):
 
     #  VBar (Alongshore/ y Transects)
 
@@ -116,7 +115,7 @@ class vBarGrid(PixelInsts):
         X = np.zeros_like(Y) + x
         Z = np.zeros_like(X) + z
 
-def runupGrid(PixelInsts):
+class runupGrid(PixelInsts):
 
     #  Runup (Cross-shore Transects)
 
@@ -129,3 +128,4 @@ def runupGrid(PixelInsts):
         X = np.arange(xlim[0], xlim[1]+dx, dx)
         Y = np.zeros_like(X) + y
         Z = np.zeros_like(X) + z
+'''
