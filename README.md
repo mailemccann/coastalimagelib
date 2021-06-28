@@ -1,2 +1,1 @@
-﻿# frfimagelib__BETA
-## name pending...
+﻿# CoastalImageLib
