@@ -13,6 +13,9 @@ from supportfuncs import initFullFileName, localTransformPoints
 
 Core Rectification Functions
 
+Adapted in part from Brittany Bruder and Kate Brodie's CIRN
+MATLAB Toolbox and Chris Sherwood's CoastCam github repo
+
 '''
 
 class Rectifier(object):
@@ -86,82 +89,59 @@ class Rectifier(object):
         produces a flag variable to indicate if the UVd point is valid.
 
         Returns:
-            DU: Nx1 vector of distorted U coordinates for N points.
-            DV: Nx1 vector of distorted V coordinates for N points.
-            flag: Nx1 vector marking if the UVd coordinate is valid(1) or not(0)
+            DU: Nx1 vector of distorted U coordinates for N points
+            DV: Nx1 vector of distorted V coordinates for N points
 
         '''
 
         # Take Calibration Information, combine it into a sigular P matrix
-        # containing both intrinsics and extrinsic information. 
+        # containing both intrinsics and extrinsic information, make
+        # homogenous
         cal = self.calib
         xyz = np.vstack((self.xyz.T,
                         np.ones((len(self.xyz),))
                         ))
         UV = np.matmul(cal.P, xyz)
-
-        # Make homogenous
-        div = np.tile(UV[2, :], (3, 1))
-        UV = UV / div
-
-        # Assign Coefficients to Intrinsic Matrix
-        NU = cal.intrinsics[0]
-        NV = cal.intrinsics[1]
-        c0U = cal.intrinsics[2]
-        c0V = cal.intrinsics[3]
-        fx = cal.intrinsics[4]
-        fy = cal.intrinsics[5]
-        d1 = cal.intrinsics[6]
-        d2 = cal.intrinsics[7]
-        d3 = cal.intrinsics[8]
-        t1 = cal.intrinsics[9]
-        t2 = cal.intrinsics[10]
+        UV = UV / np.tile(UV[2, :], (3, 1))
 
         # Normalize distances
         u = UV[0, :]
         v = UV[1, :]
-        x = (u - c0U)/fx
-        y = (v - c0V)/fy
+        x = (u - cal.c0U)/cal.fx
+        y = (v - cal.c0V)/cal.fy
 
         # Radial distortion
         r2 = x*x + y*y
-        fr = 1. + d1*r2 + d2*(r2*r2) + d3*(r2*(r2*r2))
+        fr = 1. + cal.d1*r2 + cal.d2*(r2*r2) + cal.d3*(r2*(r2*r2))
 
         # Tangential Distortion
-        dx = 2.*t1*x*y + t2*(r2+2.*x*x)
-        dy = t1*(r2+2.*y*y) + 2.*t2*x*y
+        dx = 2.*cal.t1*x*y + cal.t2*(r2+2.*x*x)
+        dy = cal.t1*(r2+2.*y*y) + 2.*cal.t2*x*y
 
-        #  Apply Correction, answer in chip pixel units
+        #  Apply Correction
         xd = x*fr + dx
         yd = y*fr + dy
-        Ud = xd*fx + c0U
-        Vd = yd*fy + c0V
+        Ud = xd*cal.fx + cal.c0U
+        Vd = yd*cal.fy + cal.c0V
+        mask = (Ud<0) | (Ud>cal.NU) | (Vd<0) | (Vd>cal.NV)
+        Ud[mask] = 0
+        Vd[mask] = 0        
 
-        # Initialize Flag
-        flag = np.ones_like(Ud)
-
-        # Flag negative UV coordinates
-        flag[np.where(Ud < 0.)] = 0.
-        flag[np.where(Vd < 0.)] = 0.
-
-        # Flag UVd coordinates greater than image size
-        flag[np.where(Ud >= NU)] = 0.
-        flag[np.where(Vd >= NV)] = 0.
-
-        # Calc maximum tangential distortion at corners
-        Um = np.array((0, 0, NU, NU))
-        Vm = np.array((0, NV, NV, 0))
+        # Calc maximum tangential distortion
+        Um = np.array((0, 0, cal.NU, cal.NU))
+        Vm = np.array((0, cal.NV, cal.NV, 0))
 
         # Normalize
-        xm = (Um-c0U)/fx
-        ym = (Vm-c0V)/fy
+        xm = (Um-cal.c0U)/cal.fx
+        ym = (Vm-cal.c0V)/cal.fy
         r2m = xm*xm + ym*ym
 
         # Tangential Distortion
-        dxm = 2.*t1*xm*ym + t2*(r2m + 2.*xm*xm)
-        dym = t1*(r2m + 2.*ym*ym) + 2.*t2*xm*ym
+        dxm = 2.*cal.t1*xm*ym + cal.t2*(r2m + 2.*xm*xm)
+        dym = cal.t1*(r2m + 2.*ym*ym) + 2.*cal.t2*xm*ym
 
         # Flag values outside xy limits
+        flag = np.ones_like(Ud)
         flag[np.where(np.abs(dy) > np.max(np.abs(dym)))] = 0.
         flag[np.where(np.abs(dx) > np.max(np.abs(dxm)))] = 0.
 
@@ -175,7 +155,7 @@ class Rectifier(object):
         flag = flag.reshape(self.xy_grid.X.shape, order='F')
         
         # Apply flag to remove invalid points (set points = 0)
-        return DU*flag, DV*flag, flag
+        return DU*flag, DV*flag
 
     def dlt2UV(self):
         ''' 
@@ -213,11 +193,14 @@ class Rectifier(object):
 
     def matchHist(self,image):
         ''' 
+
+        Trying Chris Sherwood's method if using an RBG image
+        Note: usually working with BW for Argus stuff so far
+
+
         Matches the histogram of an input image to a reference 
         image saved in self in order to better blend seams 
         of multiple cameras.
-
-        Trying Chris Sherwood's method
 
         Args:
             image (ndarray): image to match histogram
@@ -264,24 +247,12 @@ class Rectifier(object):
         # Use regular grid interpolator to grab points
         ir = np.full((self.s[0], self.s[1]), np.nan)
         rgi = reg_interp((np.arange(0, image.shape[0]),
-                            np.arange(0, image.shape[1])),
-                            image,
-                            method='linear',
-                            bounds_error=False,
-                            fill_value=np.nan)
+                          np.arange(0, image.shape[1])),
+                          image, bounds_error=False, fill_value=np.nan)
         ir = rgi((self.Vd, self.Ud))
         
         # Mask out values out of range
-        with np.errstate(invalid='ignore'):
-            mask_u = np.logical_or(
-                self.Ud < 1,
-                self.Ud > image.shape[1]
-            )
-            mask_v = np.logical_or(
-                self.Vd < 1,
-                self.Vd > image.shape[0]
-            )
-        mask = np.logical_or(mask_u,mask_v)
+        mask = (self.Ud>image.shape[1]) & (self.Ud<0) & (self.Vd>image.shape[0]) & (self.Vd<0)
         ir[mask] = np.nan
 
         return np.uint8(ir)
@@ -403,7 +374,7 @@ class Rectifier(object):
 
             # Find distorted UV points at each XY location in grid
             if self.mType == 'CIRN':
-                self.Ud, self.Vd, flag = self.xyz2DistUV()
+                self.Ud, self.Vd = self.xyz2DistUV()
             elif self.mType == 'DLT':
                 self.Ud, self.Vd = self.dlt2UV()
             else:
@@ -474,13 +445,29 @@ class Rectifier(object):
 
         return self.rect_arr
 
+    def saveNetCDF(self,rect_arr,outfile):
+        '''
+        Saves the object rect_arr as a netcdf on the user's drive
+        rect_arr can be a rectified image, struct of images, pixel instruments, etc
+        '''
+        import xarray as xr
+
+        # what data types will be used in the netcdf
+        encoding = {'merged':{'dtype':'uint8','_FillValue':0}}
+        # use xarray to create the netcdf
+        ncstruct = xr.Dataset({'merged': (['y', 'x'], rect_arr)},
+                                coords={'xyz': self.xyz,
+                                        'coord_type': self.coords,
+                                        })
+        ncstruct.to_netcdf(outfile,encoding=encoding)
+
 class CameraData(object):
     ''' 
     Object that contains camera matrices in homogenous coordinates from camera
     extrinsics and intrinsics.Must be re-initialized for each new camera
     (dependent on specific camera's intrinsic and extrinsic calibration).
 
-    Args:
+    Arguments:
         intrinsics (list or array): [1 x 11] list of intrinsic values in CIRN format or DLT coefficients
         extrinsics (list or array): [1 x 6] list of extrinsic values [ x y z azimuth tilt swing] of the camera.
             XYZ should be in the same units as xyz points to be converted and azimith,  
@@ -516,6 +503,8 @@ class CameraData(object):
             self.local_extrinsics = self.localTranformExtrinsics()
         if mType != 'DLT':
             self.P,self.K,self.R,self.IC = self.getMatrices()
+
+        self.assignCoeffs()
 
     def getMatrices(self):
         '''
@@ -580,6 +569,7 @@ class CameraData(object):
         return P,K,R,IC
 
     def localTranformExtrinsics(self):
+
         """
         Transforms extrinsics in local coordinates to geo, or extrinsics in geo coordinates to local 
         Angle should be defined by CIRN convention.
@@ -611,3 +601,18 @@ class CameraData(object):
             extrinsics_out[3] = self.local_extrinsics[3] - self.origin[2]
 
         return extrinsics_out
+
+    def assignCoeffs(self):
+
+        # Assign Coefficients to Intrinsic Matrix
+        self.NU = self.intrinsics[0]
+        self.NV = self.intrinsics[1]
+        self.c0U = self.intrinsics[2]
+        self.c0V = self.intrinsics[3]
+        self.fx = self.intrinsics[4]
+        self.fy = self.intrinsics[5]
+        self.d1 = self.intrinsics[6]
+        self.d2 = self.intrinsics[7]
+        self.d3 = self.intrinsics[8]
+        self.t1 = self.intrinsics[9]
+        self.t2 = self.intrinsics[10]

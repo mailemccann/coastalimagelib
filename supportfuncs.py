@@ -5,10 +5,11 @@ import cv2 as cv
 '''
 Supporting Functions:
 
-    localTransformPoints( xo, yo, ang, flag, xin, yin)
+    localTransformPoints(xo, yo, ang, flag, xin, yin)
         - Use this function to transform points in geo coordinates to local
             if you have the local origin in geo coordinates and angle 
             between coordinate systems
+        - Similar to Brittany, Chris codes
 
     matIntrinsics2Py(files,tag = 'CIRN')
         - This function is useful for taking intrinsics and extrinsics 
@@ -29,6 +30,18 @@ Supporting Functions:
         - savePaths = '' allows the user to save each debayered frame to their 
             drive as .png, .jpg, etc. Save paths must include the full filename
             and file extension
+    
+    
+    formatArgusFile(cams,folder,epoch):
+        -Generates filenames in Argus convention based on the epoch
+            time at the start of collection and provided camera tags.
+        -Also generates the name of the merged file of all cameras
+            to save after rectification (although this function doesn't
+            need to be used solely prior to a rectification task). 
+
+    initFullFileName(infile,label,type='avi',return_all=False):
+        -Function for conveniently creating an outfile name consistent with any
+            naming convention, given an infile name that contains the naming style
 
 '''
 
@@ -254,9 +267,8 @@ def formatArgusFile(cams,folder,epoch):
 
 def initFullFileName(infile,label,type='avi',return_all=False):
     ''' 
-    Function for conveniently creating an outfile name consistent with 
-    naming convention, given an infile name that contains the epoch time
-    of the first frame of the collection
+    Function for conveniently creating an outfile name consistent with any
+    naming convention, given an infile name that contains the naming style
     '''
 
     front = infile.split('/')

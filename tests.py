@@ -1,8 +1,12 @@
 import numpy as np
 
-x = [5,25]
-xvec = np.arange(x[0], x[1]+1, 1)
-yvec = [10]
-X, Y = np.meshgrid(xvec, yvec)
-print(X)
-print(Y)
+Ud = np.ones((5,5))
+Vd = np.ones((5,5))*2
+# Initialize Flag
+mask = np.ones_like(Ud)
+
+# Flag negative UV coordinates
+mask[(Ud < 2)] = 0
+mask[(Vd < 2)] = 0
+
+print(mask)
