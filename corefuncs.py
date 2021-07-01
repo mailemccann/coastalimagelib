@@ -20,14 +20,14 @@ MATLAB Toolbox and Chris Sherwood's CoastCam github repo
 
 class Rectifier(object):
     """
-    Object that contains parameters and functions for a rectification task that may 
-    involve multiple cameras and multiple frames. 
+    Object that contains parameters and functions for a rectification task that may
+    involve multiple cameras and multiple frames.
 
-    For multiple rectification tasks with the same desired rectification XYZ grid, 
-    you only have to initialize this function once, then call mergeRectify for 
-    each set of camera data and oblique images. 
+    For multiple rectification tasks with the same desired rectification XYZ grid,
+    you only have to initialize this function once, then call mergeRectify for
+    each set of camera data and oblique images.
 
-    If local coordinates are desired and inputs are not yet converted to local, 
+    If local coordinates are desired and inputs are not yet converted to local,
     user can flag coords = 'geo' and input local origin.
 
     If intrinsics are in a format other than CIRN (currently the only other
@@ -54,12 +54,12 @@ class Rectifier(object):
         self.origin = origin
         self.mType = mType
         self.s = self.X.shape
-    
+
     def initXYZ(self, xlims, ylims, dx, dy, z):
         '''
         Function to initialize the XYZ grid
 
-        xlims and ylims can either be an array of two numbers, 
+        xlims and ylims can either be an array of two numbers,
         or one value if a 1D transect is desired
         '''
 
@@ -94,7 +94,7 @@ class Rectifier(object):
 
         '''
 
-        # Take Calibration Information, combine it into a sigular P matrix
+        # Take Calibration Information, combine it into a singular P matrix
         # containing both intrinsics and extrinsic information, make
         # homogenous
         cal = self.calib
@@ -125,7 +125,7 @@ class Rectifier(object):
         Vd = yd*cal.fy + cal.c0V
         mask = (Ud<0) | (Ud>cal.NU) | (Vd<0) | (Vd>cal.NV)
         Ud[mask] = 0
-        Vd[mask] = 0        
+        Vd[mask] = 0
 
         # Calc maximum tangential distortion
         Um = np.array((0, 0, cal.NU, cal.NU))
@@ -153,17 +153,17 @@ class Rectifier(object):
         xyzC = np.matmul(cal.R, np.matmul(cal.IC, xyz))
         flag[np.where(xyzC[2,:] <= 0.)] = 0.
         flag = flag.reshape(self.xy_grid.X.shape, order='F')
-        
+
         # Apply flag to remove invalid points (set points = 0)
         return DU*flag, DV*flag
 
     def dlt2UV(self):
-        ''' 
+        '''
         This function computes the distorted UV coordinates (UVd)  that
         correspond to a set of world xyz points for a given camera m matrix
         for DLT equations
-        
-        Input (through self):  
+
+        Input (through self):
             m = the DLT coefficient vector A->L
             X = [N,3] maxtrix (real world coords)
 
@@ -192,19 +192,19 @@ class Rectifier(object):
         return DU, DV
 
     def matchHist(self,image):
-        ''' 
+        '''
 
         Trying Chris Sherwood's method if using an RBG image
         Note: usually working with BW for Argus stuff so far
 
 
-        Matches the histogram of an input image to a reference 
-        image saved in self in order to better blend seams 
+        Matches the histogram of an input image to a reference
+        image saved in self in order to better blend seams
         of multiple cameras.
 
         Args:
             image (ndarray): image to match histogram
-        
+
         Returns:
             matched (ndarray): modified image with matching histogram
 
@@ -231,14 +231,14 @@ class Rectifier(object):
 
     def getPixels(self, image):
 
-        ''' 
-        Pulls rgb or gray pixel intensities from image at specified 
-        pixel locations corresponding to X,Y coordinates calculated in either 
+        '''
+        Pulls rgb or gray pixel intensities from image at specified
+        pixel locations corresponding to X,Y coordinates calculated in either
         xyz2DistUV or dlt2UV.
 
         Args:
             image (ndarray): image where pixels will be taken from
-        
+
         Attributes:
             ir (ndarray): pixel intensities
 
@@ -250,7 +250,7 @@ class Rectifier(object):
                           np.arange(0, image.shape[1])),
                           image, bounds_error=False, fill_value=np.nan)
         ir = rgi((self.Vd, self.Ud))
-        
+
         # Mask out values out of range
         mask = (self.Ud>image.shape[1]) & (self.Ud<0) & (self.Vd>image.shape[0]) & (self.Vd<0)
         ir[mask] = np.nan
@@ -275,8 +275,8 @@ class Rectifier(object):
                 Each k entry is a rectified image from a camera.
 
         Returns:
-            M (ndarray): A NxM uint8 matrix of the greyscale merged rectified image. 
-                N and M are the grid lengths for the rectified image. 
+            M (ndarray): A NxM uint8 matrix of the greyscale merged rectified image.
+                N and M are the grid lengths for the rectified image.
 
         """
 
@@ -308,7 +308,7 @@ class Rectifier(object):
         # Stop divide by 0 warnings
         with np.errstate(invalid='ignore'):
             M = M / totalW
-        
+
         M[np.isnan(M)]=0
 
         return M.astype(np.uint8)
@@ -317,30 +317,30 @@ class Rectifier(object):
 
         """
         This function performs image rectifications at one timestamp given the associated
-        extrinsics, intrinsics, and distorted images corresponding to each camera. 
+        extrinsics, intrinsics, and distorted images corresponding to each camera.
         The function utilizes matchHist to match images from each camera
-        to the same histogram, then calls xyz2DistUV or dlt2UV to find corresponding 
-        UVd values to the input grid and pulls the rgb pixel intensity for 
+        to the same histogram, then calls xyz2DistUV or dlt2UV to find corresponding
+        UVd values to the input grid and pulls the rgb pixel intensity for
         each value using getPixels. If a multi-camera rectification is desired,
         images, intrinsic_list, and extrinsic_list can be input as cell values
         for each camera.
 
-        If local coordinates are desired and inputs are not yet converted to local, 
+        If local coordinates are desired and inputs are not yet converted to local,
         user can flag coords = 'geo' and input local origin.
 
         If intrinsics are in a format other than CIRN (currently the only other
         supported format is DLT), user can flag mType = 'DLT'.
 
         The function calls cameraSeamBlend as a last step to merge the values.
- 
+
         Inputs:
-            cameras_images (list OR ndarray): 1xK list of paths to image files for each camera, 
+            cameras_images (list OR ndarray): 1xK list of paths to image files for each camera,
                             OR NxMxK struct of images, one image per camera at the desired timestamp
                             for rectification
             intrinsic_list (list): 1x11xK internal calibration data for each camera
             extrinsic_list (list): 1x6xK external calibration data for each camera
-            xyz (ndarray): 3xN array if desired pixels are from different points than the main XYZ grid 
-            
+            xyz (ndarray): 3xN array if desired pixels are from different points than the main XYZ grid
+
         Returns:
             Ir (ndarray): Image intensities at xyz points (georectified image)
 
@@ -359,18 +359,18 @@ class Rectifier(object):
             if isinstance(I,str)==1:
                 # Load image from current camera
                 image = imageio.imread(I)
-            else: 
+            else:
                 image = cameras_frames[:,:,k]
-            
+
             # Match histograms
-            if k==0: 
+            if k==0:
                 self.ref = image
             else:
                 image = self.matchHist(image)
 
             # Work in grayscale
             if len(image.shape) > 2:
-                image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)  
+                image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
 
             # Find distorted UV points at each XY location in grid
             if self.mType == 'CIRN':
@@ -391,16 +391,16 @@ class Rectifier(object):
         return np.flipud(Ir.astype(np.uint8))
 
     def rectVideos(self, video_list, intrinsic_list, extrinsic_list, numFrames):
-        
+
         """
-        This function performs image rectifications on .avi files, either single or multi- cam, 
-        and saves a merged and rectified .avi to the user's drive. 
- 
+        This function performs image rectifications on .avi files, either single or multi- cam,
+        and saves a merged and rectified .avi to the user's drive.
+
         Inputs:
-            video_list (list): 1xK list of paths to video files for each camera 
+            video_list (list): 1xK list of paths to video files for each camera
             intrinsic_list (list): 1x11xK internal calibration data for each camera
             extrinsic_list (list): 1x6xK external calibration data for each camera
-            
+
         Returns:
             rect_array: h x w x numFrames array of rectified frames
 
@@ -462,7 +462,7 @@ class Rectifier(object):
         ncstruct.to_netcdf(outfile,encoding=encoding)
 
 class CameraData(object):
-    ''' 
+    '''
     Object that contains camera matrices in homogenous coordinates from camera
     extrinsics and intrinsics.Must be re-initialized for each new camera
     (dependent on specific camera's intrinsic and extrinsic calibration).
@@ -470,7 +470,7 @@ class CameraData(object):
     Arguments:
         intrinsics (list or array): [1 x 11] list of intrinsic values in CIRN format or DLT coefficients
         extrinsics (list or array): [1 x 6] list of extrinsic values [ x y z azimuth tilt swing] of the camera.
-            XYZ should be in the same units as xyz points to be converted and azimith,  
+            XYZ should be in the same units as xyz points to be converted and azimith,
             tilt, and swing should be in radians.
             (azimuth, tilt, and swing should be defined by CIRN convention- see User Manual)
         origin (list or array): local origin, x, y, and angle
@@ -555,7 +555,7 @@ class CameraData(object):
 
         IC = np.array([
             [1, 0, 0, -x],
-            [0, 1, 0, -y], 
+            [0, 1, 0, -y],
             [0, 0, 1, -z]
             ])
 
@@ -564,14 +564,14 @@ class CameraData(object):
         P = np.matmul(KR,IC)
 
         # Make homogeneous
-        P = P/P[-1,-1]   
+        P = P/P[-1,-1]
 
         return P,K,R,IC
 
     def localTranformExtrinsics(self):
 
         """
-        Transforms extrinsics in local coordinates to geo, or extrinsics in geo coordinates to local 
+        Transforms extrinsics in local coordinates to geo, or extrinsics in geo coordinates to local
         Angle should be defined by CIRN convention.
 
         Returns:
