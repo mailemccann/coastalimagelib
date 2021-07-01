@@ -1,7 +1,9 @@
 import numpy as np
 import cv2 as cv
 from scipy.interpolate import RegularGridInterpolator as reg_interp
-from corefuncs import Rectifier
+from corefuncs import Rectifier, CameraData
+import imageio
+import matplotlib.pyplot as plt
 
 
 class PixelStack(Rectifier):
@@ -31,7 +33,7 @@ class PixelStack(Rectifier):
 
         Rectifier.__init__(self, xlims, ylims, dx, dy, z, coords, origin, mType)
 
-    def getTimestack(self, im_mat, intrinsic_list, extrinsic_list, sample_rate=1):        
+    def getTimestack(self, im_mat, intrinsic_list, extrinsic_list, sample_rate=1,disp_flag=0):        
         '''
         This function generates pixel instruments (timestacks) for a given set of images and
         corresponding extrinsics/intrinsics. 
@@ -41,12 +43,55 @@ class PixelStack(Rectifier):
         # Loop for Collecting Pixel Instrument Data.
         num_frames = im_mat.shape[3]
 
-        for j in range(0,num_frames,sample_rate):
-            images = im_mat[:,:,:,j]
-            print(images.shape)
+        for curr_frame in range(0,num_frames,sample_rate):
+
         '''
-        merged = self.mergeRectify(im_mat, intrinsic_list, extrinsic_list)
-        cv.imwrite('testgrid.jpg',merged.astype(np.uint8))
+        
+        curr_frame=0
+        # Array for pixel values
+        self.numcams = len(intrinsic_list)
+        IrIndv = np.zeros((self.s[0], self.s[1], self.numcams))
+        if disp_flag: fig,axs = plt.subplots(1,self.numcams)
+
+        # Iterate through each camera from to produce single merged frame
+        for k, (intrinsics, extrinsics) in enumerate(zip(intrinsic_list, extrinsic_list)):
+            image = im_mat[:,:,k]
+
+            # Load individual camera intrinsics, extrinsics, and camera matrices
+            self.calib = CameraData(intrinsics, extrinsics, self.origin, self.coords, self.mType)
+
+            # Work in grayscale
+            if len(image.shape) > 2:
+                image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)  
+
+            # Find distorted UV points at each XY location in grid
+            if self.mType == 'CIRN':
+                self.Ud, self.Vd, flag = self.xyz2DistUV()
+            if self.mType == 'DLT':
+                self.Ud, self.Vd = self.dlt2UV()
+
+            # Grab pixels from image at each position
+            ir = self.getPixels(image)
+            IrIndv[:,:,k] = ir
+
+            if disp_flag:
+                # Show pixels on image
+                axs[k].xaxis.set_visible(False)
+                axs[k].yaxis.set_visible(False)
+                axs[k].imshow(image.astype(np.uint8), cmap='gray', vmin=0, vmax=255)
+                mask = (self.Ud<image.shape[1]) & (self.Ud>0) & (self.Vd<image.shape[0]) & (self.Vd>0)
+                axs[k].scatter(self.Ud[mask], self.Vd[mask], s=3,c="r")
+            
+        if disp_flag: plt.show()
+            
+
+        # Merge rectifications of multiple cameras
+        IrIndv[IrIndv==0] = np.nan
+        Ir = np.nanmean(IrIndv,axis=2)
+
+        # Return merged frame
+        return (Ir.astype(np.uint8))
+
 
     def getTimestackFromMovie(self, im_mat, intrinsic_list, extrinsic_list, sample_rate=1):        
         '''

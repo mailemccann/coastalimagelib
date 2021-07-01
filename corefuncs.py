@@ -45,7 +45,6 @@ class Rectifier(object):
     def __init__(self, xlims, ylims, dx=1, dy=1, z=0, coords = 'local', origin = 'None', mType = 'CIRN'):
 
         self.initXYZ(xlims, ylims, dx, dy, z)
-        print(self.xyz)
 
         # Init other params
         self.coords = coords
@@ -82,14 +81,14 @@ class Rectifier(object):
     def xyz2DistUV(self):
         '''
         This function computes the distorted UV coordinates (UVd)  that
-        correspond to a set of world xyz points for a given camera EO and IO
-        specified by extrinsics and intrinsics respectively. Function also
+        correspond to a set of world xyz points for for given camera
+        extrinsics and intrinsics. Function also
         produces a flag variable to indicate if the UVd point is valid.
 
         Returns:
-            DU= Nx1 vector of distorted U coordinates for N points.
-            DV= Nx1 vector of distorted V coordinates for N points.
-            flag= Nx1 vector marking if the UVd coordinate is valid(1) or not(0)
+            DU: Nx1 vector of distorted U coordinates for N points.
+            DV: Nx1 vector of distorted V coordinates for N points.
+            flag: Nx1 vector marking if the UVd coordinate is valid(1) or not(0)
 
         '''
 
@@ -218,8 +217,7 @@ class Rectifier(object):
         image saved in self in order to better blend seams 
         of multiple cameras.
 
-        Extracts the values channel from the image in HSV space, 
-        and matches histograms based only on the histogram of the v channel.
+        Trying Chris Sherwood's method
 
         Args:
             image (ndarray): image to match histogram
@@ -276,19 +274,14 @@ class Rectifier(object):
         # Mask out values out of range
         with np.errstate(invalid='ignore'):
             mask_u = np.logical_or(
-                self.Ud <= 1,
-                self.Ud >= image.shape[1]
+                self.Ud < 1,
+                self.Ud > image.shape[1]
             )
             mask_v = np.logical_or(
-                self.Vd <= 1,
-                self.Vd >= image.shape[0]
+                self.Vd < 1,
+                self.Vd > image.shape[0]
             )
-        mask = np.logical_or(
-            mask_u,
-            mask_v
-        )
-
-        # Apply mask
+        mask = np.logical_or(mask_u,mask_v)
         ir[mask] = np.nan
 
         return np.uint8(ir)
