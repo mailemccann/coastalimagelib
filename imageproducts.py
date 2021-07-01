@@ -12,12 +12,12 @@ class ImageStats():
     same dimensions.  
 
     Attributes:
-        iBright: brightest pixels at each location across the 
+        Bright: brightest pixels at each location across the 
                 collection
-        iDark: darkest pixels at each location across the collection
-        iTimex: time- exposure (mean) of all pixels at each location
+        Dark: darkest pixels at each location across the collection
+        Timex: time- exposure (mean) of all pixels at each location
                 across the collection
-        iVariance: standard deviation of all pixels at each location
+        Variance: standard deviation of all pixels at each location
                 across the collection
 
     """
