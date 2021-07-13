@@ -13,11 +13,23 @@ from supportfuncs import initFullFileName, localTransformPoints
 
 Core Rectification Functions
 
-Adapted in part from Brittany Bruder and Kate Brodie's CIRN
-MATLAB Toolbox and Chris Sherwood's CoastCam github repo
 
 '''
 
+<<<<<<< HEAD
+def xyz2DistUV(grid, cal):
+    '''
+    This function computes the distorted UV coordinates (UVd)  that
+    correspond to a set of world xyz points for for given camera
+    extrinsics and intrinsics. Function also
+    produces a flag variable to indicate if the UVd point is valid.
+
+    Returns:
+        DU: Nx1 vector of distorted U coordinates for N points
+        DV: Nx1 vector of distorted V coordinates for N points
+
+    '''
+=======
 class Rectifier(object):
     """
     Object that contains parameters and functions for a rectification task that may
@@ -29,26 +41,94 @@ class Rectifier(object):
 
     If local coordinates are desired and inputs are not yet converted to local,
     user can flag coords = 'geo' and input local origin.
+>>>>>>> 65a63ef8cb43f54fb71f7def62afdd96aa9a93c0
 
-    If intrinsics are in a format other than CIRN (currently the only other
-    supported format is DLT), user can flag mType = 'DLT'.
+    # Take Calibration Information, combine it into a sigular P matrix
+    # containing both intrinsics and extrinsic information, make
+    # homogenous
+    xyz = np.vstack((grid.xyz.T,
+                    np.ones((len(grid.xyz),))
+                    ))
+    UV = np.matmul(cal.P, xyz)
+    UV = UV / np.tile(UV[2, :], (3, 1))
 
-    Args:
-        xlims (ndarray): min and max (inclusive) in the x-direction (e.g. [-250, 500])
-        ylims (ndarray): min and max (inclusive) in the y-direction (e.g. [0, 1800])
-        dx (float): resolution of grid in x direction (same units as camera calibration)
-        dy (float): resolution of grid in y direction (same units as camera calibration)
-        z (float): estimated elevation at every point in the x, y grid
-        coords (string): 'geo' or 'local'; if 'geo', extrinsics are transformed to local
-                but origin is needed to transform
-        origin: local origin (x,y,z,angle)
-        mType (string): format of intrinsic matrix, 'CIRN' is default, 'DLT' is also supported
+    # Normalize distances
+    u = UV[0, :]
+    v = UV[1, :]
+    x = (u - cal.c0U)/cal.fx
+    y = (v - cal.c0V)/cal.fy
 
-    """
-    def __init__(self, xlims, ylims, dx=1, dy=1, z=0, coords = 'local', origin = 'None', mType = 'CIRN'):
+    # Radial distortion
+    r2 = x*x + y*y
+    fr = 1. + cal.d1*r2 + cal.d2*(r2*r2) + cal.d3*(r2*(r2*r2))
 
-        self.initXYZ(xlims, ylims, dx, dy, z)
+    # Tangential Distortion
+    dx = 2.*cal.t1*x*y + cal.t2*(r2+2.*x*x)
+    dy = cal.t1*(r2+2.*y*y) + 2.*cal.t2*x*y
 
+    #  Apply Correction
+    xd = x*fr + dx
+    yd = y*fr + dy
+    Ud = xd*cal.fx + cal.c0U
+    Vd = yd*cal.fy + cal.c0V
+    mask = (Ud<0) | (Ud>cal.NU) | (Vd<0) | (Vd>cal.NV)
+    Ud[mask] = 0
+    Vd[mask] = 0        
+
+    # Calc maximum tangential distortion
+    Um = np.array((0, 0, cal.NU, cal.NU))
+    Vm = np.array((0, cal.NV, cal.NV, 0))
+
+    # Normalize
+    xm = (Um-cal.c0U)/cal.fx
+    ym = (Vm-cal.c0V)/cal.fy
+    r2m = xm*xm + ym*ym
+
+    # Tangential Distortion
+    dxm = 2.*cal.t1*xm*ym + cal.t2*(r2m + 2.*xm*xm)
+    dym = cal.t1*(r2m + 2.*ym*ym) + 2.*cal.t2*xm*ym
+
+    # Flag values outside xy limits
+    flag = np.ones_like(Ud)
+    flag[np.where(np.abs(dy) > np.max(np.abs(dym)))] = 0.
+    flag[np.where(np.abs(dx) > np.max(np.abs(dxm)))] = 0.
+
+    DU = Ud.reshape(grid.X.shape, order='F')
+    DV = Vd.reshape(grid.Y.shape, order='F')
+
+    # Flag negative Z values
+    UV = np.matmul(cal.P, xyz)
+    xyzC = np.matmul(cal.R, np.matmul(cal.IC, xyz))
+    flag[np.where(xyzC[2,:] <= 0.)] = 0.
+    flag = flag.reshape(grid.X.shape, order='F')
+    
+    # Apply flag to remove invalid points (set points = 0)
+    return DU*flag, DV*flag
+
+def dlt2UV(grid, cal):
+    ''' 
+    This function computes the distorted UV coordinates (UVd)  that
+    correspond to a set of world xyz points for a given camera m matrix
+    for DLT equations
+    
+    Input (through self):  
+        cal: CameraData object containing the DLT coefficient vector A->L
+        grid: XYZGrid object containing real world coords
+
+    Attributes:
+        DU= Nx1 vector of distorted U coordinates for N points.
+        DV= Nx1 vector of distorted V coordinates for N points.
+
+    '''
+
+<<<<<<< HEAD
+    m = np.asarray(cal.intrinsics)
+    m = m.reshape(-1,1)
+
+    #  Carry out the equivalent vectorized calculation of
+    #       U = (Ax + By + Cz + D) / (Ex + Fy + Gz + 1)
+    #       V = (Hx + Jy + Kz + L) / (Ex + Fy + Gz + 1)
+=======
         # Init other params
         self.coords = coords
         self.origin = origin
@@ -62,38 +142,27 @@ class Rectifier(object):
         xlims and ylims can either be an array of two numbers,
         or one value if a 1D transect is desired
         '''
+>>>>>>> 65a63ef8cb43f54fb71f7def62afdd96aa9a93c0
 
-        if len(xlims)<2:
-            xvec = xlims
-        else:
-            xvec = np.arange(xlims[0], xlims[1]+dx, dx)
+    x2 = np.hstack((grid.xyz, np.ones((grid.xyz.shape[0], 1))))
 
-        if len(ylims)<2:
-            yvec = ylims
-        else:
-            yvec = np.arange(ylims[0], ylims[1]+dy, dy)
+    denom = np.matmul(x2,np.vstack((m[4:7], 1)))
+    U = np.matmul(x2,m[0:4]) / denom
+    V = np.matmul(x2,m[7:11]) / denom
 
-        # Make XYZ grid
-        self.X, self.Y = np.meshgrid(xvec, yvec)
-        self.Z = np.zeros_like(self.X) + z
-        x = self.X.copy().T.flatten()
-        y = self.Y.copy().T.flatten()
-        z = self.Z.copy().T.flatten()
-        self.xyz = np.vstack((x, y, z)).T
+    DU = U.reshape(grid.X.shape, order='F')
+    DV = V.reshape(grid.Y.shape, order='F')
 
-    def xyz2DistUV(self):
-        '''
-        This function computes the distorted UV coordinates (UVd)  that
-        correspond to a set of world xyz points for for given camera
-        extrinsics and intrinsics. Function also
-        produces a flag variable to indicate if the UVd point is valid.
+    return DU, DV
 
-        Returns:
-            DU: Nx1 vector of distorted U coordinates for N points
-            DV: Nx1 vector of distorted V coordinates for N points
+def matchHist(ref,image):
+    ''' 
 
-        '''
+    Trying Chris Sherwood's method if using an RBG image
+    Note: usually working with BW for Argus stuff so far
 
+<<<<<<< HEAD
+=======
         # Take Calibration Information, combine it into a singular P matrix
         # containing both intrinsics and extrinsic information, make
         # homogenous
@@ -166,38 +235,77 @@ class Rectifier(object):
         Input (through self):
             m = the DLT coefficient vector A->L
             X = [N,3] maxtrix (real world coords)
+>>>>>>> 65a63ef8cb43f54fb71f7def62afdd96aa9a93c0
 
-        Attributes:
-            DU= Nx1 vector of distorted U coordinates for N points.
-            DV= Nx1 vector of distorted V coordinates for N points.
+    Matches the histogram of an input image to a reference 
+    image saved in self in order to better blend seams 
+    of multiple cameras.
 
-        '''
+    Args:
+        ref (ndarray): reference image 
+        image (ndarray): image to match histogram
+    
+    Returns:
+        matched (ndarray): modified image with matching histogram
 
-        m = np.asarray(self.calib.intrinsics)
-        m = m.reshape(-1,1)
+    '''
 
-        #  Carry out the equivalent vectorized calculation of
-        #       U = (Ax + By + Cz + D) / (Ex + Fy + Gz + 1)
-        #       V = (Hx + Jy + Kz + L) / (Ex + Fy + Gz + 1)
+    if len(image.shape) > 2:
+        # Convert to hsv space
+        im_hsv = cv.cvtColor(image, cv.COLOR_RGB2HSV)
+        ref_hsv = cv.cvtColor(ref, cv.COLOR_RGB2HSV)
 
-        x2 = np.hstack((self.xyz, np.ones((self.xyz.shape[0], 1))))
+        # Match histogram to reference hist on only v channel
+        matched_v = match_histograms(im_hsv[:,:,2],ref_hsv[:,:,2], multichannel=False)
 
-        denom = np.matmul(x2,np.vstack((m[4:7], 1)))
-        U = np.matmul(x2,m[0:4]) / denom
-        V = np.matmul(x2,m[7:11]) / denom
+        # Paste matched values channel into HSV version of source image; convert back to RGB
+        matched_hsv = im_hsv.copy()
+        matched_hsv[:,:,2] = matched_v
+        matched = cv.cvtColor(matched_hsv, cv.COLOR_HSV2RGB)
+    else:
+        if len(ref.shape) > 2:
+            ref = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
 
-        DU = U.reshape(self.X.shape, order='F')
-        DV = V.reshape(self.Y.shape, order='F')
+        matched = match_histograms(image, ref, multichannel=False)
+    return matched
 
-        return DU, DV
+def getPixels(image, Ud, Vd, s):
 
+<<<<<<< HEAD
+    ''' 
+    Pulls rgb or gray pixel intensities from image at specified 
+    pixel locations corresponding to X,Y coordinates calculated in either 
+    xyz2DistUV or dlt2UV.
+=======
     def matchHist(self,image):
         '''
+>>>>>>> 65a63ef8cb43f54fb71f7def62afdd96aa9a93c0
 
-        Trying Chris Sherwood's method if using an RBG image
-        Note: usually working with BW for Argus stuff so far
+    Args:
+        image (ndarray): image where pixels will be taken from
+        Ud: Nx1 vector of distorted U coordinates for N points
+        Vd: Nx1 vector of distorted V coordinates for N points
+        s: shape of output image
+    
+    Returns:
+        ir (ndarray): pixel intensities
 
+    '''
 
+<<<<<<< HEAD
+    # Use regular grid interpolator to grab points
+    ir = np.full((s[0], s[1]), np.nan)
+    rgi = reg_interp((np.arange(0, image.shape[0]),
+                      np.arange(0, image.shape[1])),
+                      image, bounds_error=False, fill_value=np.nan)
+    ir = rgi((Vd, Ud))
+    
+    # Mask out values out of range
+    mask = (Ud>image.shape[1]) & (Ud<0) & (Vd>image.shape[0]) & (Vd<0)
+    ir[mask] = np.nan
+
+    return np.uint8(ir)
+=======
         Matches the histogram of an input image to a reference
         image saved in self in order to better blend seams
         of multiple cameras.
@@ -207,30 +315,39 @@ class Rectifier(object):
 
         Returns:
             matched (ndarray): modified image with matching histogram
+>>>>>>> 65a63ef8cb43f54fb71f7def62afdd96aa9a93c0
 
-        '''
-        if len(image.shape) > 2:
-            # Convert to hsv space
-            im_hsv = cv.cvtColor(image, cv.COLOR_RGB2HSV)
-            ref_hsv = cv.cvtColor(self.ref, cv.COLOR_RGB2HSV)
+def cameraSeamBlend(self, IrIndv):
+    """
+    This function takes rectifications from different cameras (but same grid)
+    and merges them together into a single rectification. To do this, the function
+    performs a weighted average where pixels closest to the seams are not
+    represented as strongly as those closest to the center of the camera
+    rectification.
 
-            # Match histogram to reference hist on only v channel
-            matched_v = match_histograms(im_hsv[:,:,2],ref_hsv[:,:,2], multichannel=False)
+    Notes:
+        - Calculates Euclidean distance for each entry to nearest non-zero pixel value
+        - edt: Euclidean Distance Transform
 
-            # Paste matched values channel into HSV version of source image; convert back to RGB
-            matched_hsv = im_hsv.copy()
-            matched_hsv[:,:,2] = matched_v
-            matched = cv.cvtColor(matched_hsv, cv.COLOR_HSV2RGB)
-        else:
-            if len(self.ref.shape) > 2:
-                ref = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
-            else: ref = self.ref
+    Args:
+        IrIndv (ndarray) A NxMxK matrix where N and M are the grid lengths for the
+            rectified image and K is the number of cameras.
+            Each k entry is a rectified image from a camera.
 
-            matched = match_histograms(image, ref, multichannel=False)
-        return matched
+    Returns:
+        M (ndarray): A NxM uint8 matrix of the greyscale merged rectified image. 
+            N and M are the grid lengths for the rectified image. 
 
-    def getPixels(self, image):
+    """
 
+<<<<<<< HEAD
+    totalW = np.zeros_like(IrIndv[:,:,0])
+    M = np.zeros_like(IrIndv[:,:,0])
+
+    # Iterate through each camera
+    for kk in range(np.size(IrIndv)[-1]):
+        K = IrIndv[:,:,kk]
+=======
         '''
         Pulls rgb or gray pixel intensities from image at specified
         pixel locations corresponding to X,Y coordinates calculated in either
@@ -241,9 +358,19 @@ class Rectifier(object):
 
         Attributes:
             ir (ndarray): pixel intensities
+>>>>>>> 65a63ef8cb43f54fb71f7def62afdd96aa9a93c0
 
-        '''
+        # Make binary matrix from image (1 for Nan, 0 for nonnan)
+        K[K==0] = np.nan
 
+<<<<<<< HEAD
+        # edt finds euclidean distance from Nan to closest real value
+        # Find the nans, then invert
+        W = distance_transform_edt(~np.isnan(K))
+        if np.isinf(np.max(W)):
+            W = np.ones_like(W)
+        W = W / np.max(W)
+=======
         # Use regular grid interpolator to grab points
         ir = np.full((self.s[0], self.s[1]), np.nan)
         rgi = reg_interp((np.arange(0, image.shape[0]),
@@ -254,67 +381,131 @@ class Rectifier(object):
         # Mask out values out of range
         mask = (self.Ud>image.shape[1]) & (self.Ud<0) & (self.Vd>image.shape[0]) & (self.Vd<0)
         ir[mask] = np.nan
+>>>>>>> 65a63ef8cb43f54fb71f7def62afdd96aa9a93c0
 
-        return np.uint8(ir)
+        # Apply weights to image
+        K_weighted = K*W
 
-    def cameraSeamBlend(self, IrIndv):
-        """
-        This function takes rectifications from different cameras (but same grid)
-        and merges them together into a single rectification. To do this, the function
-        performs a weighted average where pixels closest to the seams are not
-        represented as strongly as those closest to the center of the camera
-        rectification.
+        # Add weights and pixel itensities
+        totalW = totalW + W
+        K_weighted[np.isnan(K_weighted)] = 0
+        M = M + K_weighted
 
-        Notes:
-            - Calculates Euclidean distance for each entry to nearest non-zero pixel value
-            - edt: Euclidean Distance Transform
+    # Stop divide by 0 warnings
+    with np.errstate(invalid='ignore'):
+        M = M / totalW
+    
+    M[np.isnan(M)]=0
 
-        Args:
-            IrIndv (ndarray) A NxMxK matrix where N and M are the grid lengths for the
-                rectified image and K is the number of cameras.
-                Each k entry is a rectified image from a camera.
+    return M.astype(np.uint8)
 
+<<<<<<< HEAD
+def mergeRectify(cameras_frames, intrinsic_list, extrinsic_list, grid, coords = 'local', origin = 'None', mType = 'CIRN'):
+=======
         Returns:
             M (ndarray): A NxM uint8 matrix of the greyscale merged rectified image.
                 N and M are the grid lengths for the rectified image.
+>>>>>>> 65a63ef8cb43f54fb71f7def62afdd96aa9a93c0
 
-        """
+    """
+    This function performs image rectifications at one timestamp given the associated
+    extrinsics, intrinsics, and distorted images corresponding to each camera. 
+    The function utilizes matchHist to match images from each camera
+    to the same histogram, then calls xyz2DistUV or dlt2UV to find corresponding 
+    UVd values to the input grid and pulls the rgb pixel intensity for 
+    each value using getPixels. If a multi-camera rectification is desired,
+    images, intrinsic_list, and extrinsic_list can be input as cell values
+    for each camera.
 
-        totalW = np.zeros_like(IrIndv[:,:,0])
-        M = np.zeros_like(IrIndv[:,:,0])
+    If local coordinates are desired and inputs are not yet converted to local, 
+    user can flag coords = 'geo' and input local origin.
 
-        # Iterate through each camera
-        for kk in range(self.numcams):
-            K = IrIndv[:,:,kk]
+    If intrinsics are in a format other than CIRN (currently the only other
+    supported format is DLT), user can flag mType = 'DLT'.
 
-            # Make binary matrix from image (1 for Nan, 0 for nonnan)
-            K[K==0] = np.nan
+    The function calls cameraSeamBlend as a last step to merge the values.
 
-            # edt finds euclidean distance from Nan to closest real value
-            # Find the nans, then invert
-            W = distance_transform_edt(~np.isnan(K))
-            if np.isinf(np.max(W)):
-                W = np.ones_like(W)
-            W = W / np.max(W)
+    Inputs:
+        cameras_images (list OR ndarray): 1xK list of paths to image files for each camera, 
+                        OR NxMxK struct of images, one image per camera at the desired timestamp
+                        for rectification
+        intrinsic_list (list): 1x11xK internal calibration data for each camera
+        extrinsic_list (list): 1x6xK external calibration data for each camera
+        xyz (ndarray): 3xN array if desired pixels are from different points than the main XYZ grid 
+        
+    Returns:
+        Ir (ndarray): Image intensities at xyz points (georectified image)
 
-            # Apply weights to image
-            K_weighted = K*W
+    """
+    # Array for pixel values
+    s = grid.X.shape
+    numcams = len(intrinsic_list)
+    IrIndv = np.zeros((s[0], s[1], numcams))
 
-            # Add weights and pixel itensities
-            totalW = totalW + W
-            K_weighted[np.isnan(K_weighted)] = 0
-            M = M + K_weighted
+    # Iterate through each camera from to produce single merged frame
+    for k, (I, intrinsics, extrinsics) in enumerate(zip(cameras_frames, intrinsic_list, extrinsic_list)):
 
+        # Load individual camera intrinsics, extrinsics, and camera matrices
+        calib = CameraData(intrinsics, extrinsics, origin, coords, mType)
+
+        # User can load filepaths or images, determine which we are working with
+        if isinstance(I,str)==1:
+            # Load image from current camera
+            image = imageio.imread(I)
+        else: 
+            image = cameras_frames[:,:,k]
+        
+        # Match histograms
+        if k==0: 
+            ref = image
+        else:
+            image = matchHist(ref, image)
+
+        # Work in grayscale
+        if len(image.shape) > 2:
+            image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)  
+
+<<<<<<< HEAD
+        # Find distorted UV points at each XY location in grid
+        if mType == 'CIRN':
+            Ud, Vd = xyz2DistUV(grid, calib)
+        elif mType == 'DLT':
+            Ud, Vd = dlt2UV(grid, calib)
+        else:
+            sys.exit('This intrinsics format is not supported')
+=======
         # Stop divide by 0 warnings
         with np.errstate(invalid='ignore'):
             M = M / totalW
 
         M[np.isnan(M)]=0
+>>>>>>> 65a63ef8cb43f54fb71f7def62afdd96aa9a93c0
 
-        return M.astype(np.uint8)
+        # Grab pixels from image at each position
+        ir = getPixels(image, Ud, Vd, s)
+        IrIndv[:,:,k] = ir
 
-    def mergeRectify(self, cameras_frames, intrinsic_list, extrinsic_list):
+    # Merge rectifications of multiple cameras
+    Ir = cameraSeamBlend(IrIndv)
 
+<<<<<<< HEAD
+    # Return merged frame
+    return np.flipud(Ir.astype(np.uint8))
+
+def rectVideos(video_list, intrinsic_list, extrinsic_list, numFrames):
+    
+    """
+    This function performs image rectifications on .avi files, either single or multi- cam, 
+    and saves a merged and rectified .avi to the user's drive. 
+
+    Inputs:
+        video_list (list): 1xK list of paths to video files for each camera 
+        intrinsic_list (list): 1x11xK internal calibration data for each camera
+        extrinsic_list (list): 1x6xK external calibration data for each camera
+        
+    Returns:
+        rect_array: h x w x numFrames array of rectified frames
+=======
         """
         This function performs image rectifications at one timestamp given the associated
         extrinsics, intrinsics, and distorted images corresponding to each camera.
@@ -403,63 +594,106 @@ class Rectifier(object):
 
         Returns:
             rect_array: h x w x numFrames array of rectified frames
+>>>>>>> 65a63ef8cb43f54fb71f7def62afdd96aa9a93c0
 
-        """
+    """
 
-        caps = []
-        # Append each video capture object into structure
-        for path in video_list:
-            caps.append(cv.VideoCapture(path))
+    caps = []
+    # Append each video capture object into structure
+    for path in video_list:
+        caps.append(cv.VideoCapture(path))
 
-        # Loop through each frame
-        for i in range(numFrames):
-            for ind, cap in enumerate(caps):
-                ret, frame = cap.read()
-                if not ret:
-                    break
+    # Loop through each frame
+    for i in range(numFrames):
+        for ind, cap in enumerate(caps):
+            ret, frame = cap.read()
+            if not ret:
+                break
 
-                # Add each frame into one object
-                if ind==0:
-                    frames = np.empty((frame.shape[0],frame.shape[1],len(video_list)))
-                frames[:,:,ind] = frame[:,:,0]
+            # Add each frame into one object
+            if ind==0:
+                frames = np.empty((frame.shape[0],frame.shape[1],len(video_list)))
+            frames[:,:,ind] = frame[:,:,0]
 
-            # All frames from one timestamp sent to mergeRectify
-            merged = self.mergeRectify(frames, intrinsic_list, extrinsic_list)
+        # All frames from one timestamp sent to mergeRectify
+        merged = mergeRectify(frames, intrinsic_list, extrinsic_list)
 
-            if i ==0:
-                # Create videowriter object to save video to drive
-                self.outFile = initFullFileName(video_list[0],'video_capture.rect',type='avi')
-                result = cv.VideoWriter(self.outFile,cv.VideoWriter_fourcc('M','J','P','G'),
-                                        1, (merged.shape[1],merged.shape[0]),0)
-                # Initialize array of images
-                self.rect_arr = np.empty((merged.shape[0],merged.shape[1],numFrames))
+        if i ==0:
+            # Create videowriter object to save video to drive
+            outFile = initFullFileName(video_list[0],'video_capture.rect',type='avi')
+            result = cv.VideoWriter(outFile,cv.VideoWriter_fourcc('M','J','P','G'),
+                                    1, (merged.shape[1],merged.shape[0]),0)
+            # Initialize array of images
+            rect_arr = np.empty((merged.shape[0],merged.shape[1],numFrames))
 
-            # Write to drive
-            result.write(merged.astype(np.uint8))
+        # Write to drive
+        result.write(merged.astype(np.uint8))
 
-            # Add to image array
-            self.rect_arr[:,:,i] = merged.astype(np.uint8)
+        # Add to image array
+        rect_arr[:,:,i] = merged.astype(np.uint8)
 
-        print('Rectified .avi movie saved to working directory as: ' + self.outFile)
-        result.release()
+    print('Rectified .avi movie saved to working directory as: ' + outFile)
+    result.release()
 
-        return self.rect_arr
+    return rect_arr
 
-    def saveNetCDF(self,rect_arr,outfile):
+
+class XYZGrid(object):
+    """
+    Real world XYZ Grid onto which images will be rectified. Limits should be 
+    given in local coordinates and have the same coordinates as camera intrinsic
+    and extrinsic values.
+
+    For multiple rectification tasks with the same desired rectification XYZ grid, 
+    you only have to initialize this class once, then call mergeRectify for 
+    each set of camera data and oblique images. 
+
+    If local coordinates are desired and inputs are not yet converted to local, 
+    user can flag coords = 'geo' and input local origin.
+
+    If intrinsics are in a format other than CIRN (currently the only other
+    supported format is DLT), user can flag mType = 'DLT'.
+
+    Args:
+        xlims (ndarray): min and max (inclusive) in the x-direction (e.g. [-250, 500])
+        ylims (ndarray): min and max (inclusive) in the y-direction (e.g. [0, 1800])
+        dx (float): resolution of grid in x direction (same units as camera calibration)
+        dy (float): resolution of grid in y direction (same units as camera calibration)
+        z (float): estimated elevation at every point in the x, y grid
+    """
+
+    def __init__(self, xlims, ylims, dx=1, dy=1, z=0):
+
+        self.initXYZ(xlims, ylims, dx, dy, z)
+
+        # Init other params
+        self.s = self.X.shape
+    
+    def initXYZ(self, xlims, ylims, dx, dy, z):
         '''
-        Saves the object rect_arr as a netcdf on the user's drive
-        rect_arr can be a rectified image, struct of images, pixel instruments, etc
-        '''
-        import xarray as xr
+        Function to initialize the XYZ grid
 
-        # what data types will be used in the netcdf
-        encoding = {'merged':{'dtype':'uint8','_FillValue':0}}
-        # use xarray to create the netcdf
-        ncstruct = xr.Dataset({'merged': (['y', 'x'], rect_arr)},
-                                coords={'xyz': self.xyz,
-                                        'coord_type': self.coords,
-                                        })
-        ncstruct.to_netcdf(outfile,encoding=encoding)
+        xlims and ylims can either be an array of two numbers, 
+        or one value if a 1D transect is desired
+        '''
+
+        if len(xlims)<2:
+            xvec = xlims
+        else:
+            xvec = np.arange(xlims[0], xlims[1]+dx, dx)
+
+        if len(ylims)<2:
+            yvec = ylims
+        else:
+            yvec = np.arange(ylims[0], ylims[1]+dy, dy)
+
+        # Make XYZ grid
+        self.X, self.Y = np.meshgrid(xvec, yvec)
+        self.Z = np.zeros_like(self.X) + z
+        x = self.X.copy().T.flatten()
+        y = self.Y.copy().T.flatten()
+        z = self.Z.copy().T.flatten()
+        self.xyz = np.vstack((x, y, z)).T
 
 class CameraData(object):
     '''
@@ -491,6 +725,7 @@ class CameraData(object):
         self.intrinsics = intrinsics
         self.origin = origin
         self.coords = coords
+        self.mType = mType
 
         # If in geo coordinates, convert to local
         self.local_extrinsics = extrinsics
