@@ -233,6 +233,7 @@ def deBayerArgus(cams,rawPaths,startFrame = 0,savePaths='None'):
     import argusIO
     
     cameras = dict()
+
     for p in range(len(cams)):
 
         # how many raw frames to skip
@@ -287,7 +288,8 @@ def formatArgusFile(cams,folder,epoch):
     mon_str = t.strftime('%b')
 
     day_folder = jul_str + '_' + mon_str + '.' + str(t.day).zfill(2) + '/'
-    file = str(epoch)+ '.'+ day_str+ '.'+ mon_str+ '.'+ str(t.day).zfill(2)+ '_'+str(t.hour).zfill(2)+ '_00_00.GMT.'+ str(t.year)+ '.argus02b.'
+    file = str(epoch)+ '.'+ day_str+ '.'+ mon_str+ '.'+ str(t.day).zfill(2)+ '_' + \
+            str(t.hour).zfill(2)+ '_00_00.GMT.'+ str(t.year)+ '.argus02b.'
     paths = [(folder + day_folder + file + cams[i] + '.raw') for i in range(len(cams))]
     outFile = folder + file + 'merged.avi'
 

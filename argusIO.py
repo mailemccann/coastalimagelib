@@ -3,8 +3,22 @@ import numpy as np
 import cv2
 import scipy.spatial.qhull as qhull
 
+'''
+Argus specific class and class functions to work with *.raw Argus sensor data 
+
+DeBayering workflow:
+    1. Initialize cameraIO object
+    2. Call readRaw()
+    3. Call deBayerRawFrameOpenCV() if grayscale desired
+        - Grayscale frame now saved in self.imGray
+                          OR 
+       Call deBayerRawFrameOpenCVForColor() if RBG desired
+        - RGB components saved in self.imR, self.imG, self.imB
+''' 
 
 class cameraIO():
+    '''
+    Class containing camera data and functions'''
 
     def __init__(self, **kwargs):
 
@@ -20,16 +34,32 @@ class cameraIO():
         self.skip = kwargs.get('skip', 0)
 
     def getCameraData(self):
+
+        '''
+        Loads camera data from yamlPath file containing camera intrinsic and extrinsic values
+        
+        '''
         with open(self.yamlPath, 'r') as f:
             self.cameraData = yaml.load(f, Loader=yaml.FullLoader)
 
     def readRaw(self):
+        '''
+        This function is utilized for opening *.raw Argus files prior to a debayering task, 
+        and adds the 
+
+        Must call this function before calling any debayering functions 
+        '''
         with open(self.rawPath, "rb") as my_file:
             self.fh = my_file
             cameraIO.readHeaderLines(self)
             cameraIO.readAIIIrawFullFrame(self)
 
     def readHeaderLines(self):
+        '''
+        Reads the header lines of a .raw file to obtain metadata to
+        feed into deBayering function
+
+        '''
 
         separated = dict()
         lines = dict()
@@ -53,16 +83,30 @@ class cameraIO():
         self.h = int(separated['cameraHeight'])
 
     def readAIIIrawCropped(self):
+        
+        '''
+        This function reads AIII raw files and populates the self.raw object 
+        by reading the *.raw file frame by frame and adding each to the multi-
+        dimensional array and cropping the frames based on the user defined 
+        umin, umax, vmin, vmax
+
+        Attributes: 
+            self.raw: (ndarray) contains all raw sensor data from one camera, 
+                read from self.rawPath
+        
+        '''
         self.umin = self.cameraData[self.cameraID]['umin']
         self.umax = self.cameraData[self.cameraID]['umax']
         self.vmin = self.cameraData[self.cameraID]['vmin']
         self.vmax = self.cameraData[self.cameraID]['vmax']
         skipoffset = self.skip*32 + self.skip*self.w*self.h
         self.fh.seek(30, 1)
+
         print("working on camera", self.cameraID)
+
         if skipoffset > 0:
             for i in range(self.nFrames):
-                #print("reading frame {}".format(i))
+                print("Reading frame {}".format(i))
                 if i == 0:
                     binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h, offset=skipoffset)
                 else:
@@ -84,12 +128,10 @@ class cameraIO():
         else:
 
             for i in range(self.nFrames):
-                #print("reading frame {}".format(i))
+                print("Reading frame {}".format(i))
                 if i == 0:
                     binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h)
                 else:
-                    # fh.seek(30, 1)
-                    #binary = np.vstack((binary, np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h, offset=32)))
                     binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h, offset=32)
 
                 data = np.uint8(binary)
@@ -109,12 +151,22 @@ class cameraIO():
 
     def readAIIIrawFullFrame(self):
 
+        '''
+        This function reads AIII raw files and populates the self.raw object 
+        by reading the *.raw file frame by frame and adding each to the multi-
+        dimensional array without cropping the frames
+
+        Attributes: 
+            self.raw: (ndarray) contains all raw sensor data from one camera, 
+                read from self.rawPath
+        
+        '''
+
         skipoffset = self.skip*32 + self.skip*self.w*self.h
         self.fh.seek(30, 1)
-        #print("working on camera", self.cameraID)
         if skipoffset > 0:
             for i in range(self.nFrames):
-                #print("reading frame {}".format(i))
+
                 if i == 0:
                     binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h, offset=skipoffset)
                 else:
@@ -134,12 +186,10 @@ class cameraIO():
         else:
 
             for i in range(self.nFrames):
-                #print("reading frame {}".format(i))
+                print("Reading frame {}".format(i))
                 if i == 0:
                     binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h)
                 else:
-                    # fh.seek(30, 1)
-                    #binary = np.vstack((binary, np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h, offset=32)))
                     binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h, offset=32)
 
                 data = np.uint8(binary)
@@ -153,6 +203,14 @@ class cameraIO():
             self.raw = I
 
     def deBayerRawFrame(self):
+        '''
+        deBayers a raw frame using Argus framework, adapted from
+        original Matlab code from John Stanley
+
+        Attributes:
+            self.imGray: 
+        
+        '''
 
         im = np.zeros(np.shape(self.raw))
         imGray = np.zeros(np.shape(self.raw))
@@ -162,7 +220,7 @@ class cameraIO():
 
         for ib in range(self.nFrames):
 
-            #print('debayering frame {}'.format(ib))
+            print('DeBayering frame {}'.format(ib))
             frame = self.raw[:, :, ib]
 
             # python code adpoted from Argus framework
@@ -194,76 +252,54 @@ class cameraIO():
                 for j in range(Gmin[3], self.w - 1, 2):
                     G[i - 1, j - 1] = np.mean((G[i - 2, j - 1], G[i, j - 1], G[i - 1, j], G[i - 1, j - 2]), axis=0)
 
-            # debayer = np.dstack((R, G, B))
-
-            # img = np.divide(debayer, 255)
-
-            from PIL import Image
-
             rgbArray = np.zeros((2048, 2448, 3), 'uint8')
-            rgbArray[..., 0] = R  # imR[:, :, 0] * 255
-            rgbArray[..., 1] = G  # imG[:, :, 0] * 255
-            rgbArray[..., 2] = B  # imB[:, :, 0] * 255
+            rgbArray[..., 0] = R
+            rgbArray[..., 1] = G 
+            rgbArray[..., 2] = B 
             imGrayscale = cv2.cvtColor(rgbArray, cv2.COLOR_BGR2GRAY)
 
-            # cv2.imshow("cv2version",rgbArray)
-            # imag = Image.fromarray(rgbArray)  # .convert('L')
-            #
-            # # image_enhanced = cv2.equalizeHist(imGray)
-            #
-            # # imR = np.zeros(np.shape(debayer))
-            # imR[:, :, ib] = R  # img[:, :, 0]
-            # # imB = np.zeros(np.shape(im))
-            # imB[:, :, ib] = B  # img[:, :, 2]
-            # # imG = np.zeros(np.shape(debayer))
-            # imG[:, :, ib] = G  # img[:, :, 1]
-            # #im[:, :, ib] = imag
             imGray[:, :, ib] = imGrayscale
 
-            #self.im = im
             self.imGray = imGray
-            #self.imR = imR
-            #self.imG = imG
-            #self.imB = imB
 
     def deBayerRawFrameOpenCVForColor(self):
+        '''
+        deBayers a raw frame utilizing the package opencv
+        
+        Use this function for debayering into an RGB image output
+        
+        '''
 
         im = np.zeros(np.shape(self.raw), dtype='uint8')
-        #self.imGrayCV = np.zeros(np.shape(self.raw), dtype='uint8')
+
         imR = np.zeros(np.shape(self.raw), dtype='uint8')
         imB = np.zeros(np.shape(self.raw), dtype='uint8')
         imG = np.zeros(np.shape(self.raw), dtype='uint8')
 
         for ib in range(self.nFrames):
 
-            print('debayering frame {}'.format(ib))
+            print('DeBayering frame {}'.format(ib))
             frame = self.raw[:, :, ib]
             framecopy = np.uint8(frame)
             rgbArray = cv2.cvtColor(framecopy, cv2.COLOR_BayerGB2BGR)
 
-            #imGrayscale = cv2.cvtColor(rgbArray, cv2.COLOR_BGR2GRAY)
-
-            # cv2.imshow("cv2version",rgbArray)
-            # imag = Image.fromarray(rgbArray)  # .convert('L')
-            #
-            # # image_enhanced = cv2.equalizeHist(imGray)
-            #
-            # # imR = np.zeros(np.shape(debayer))
-            imR[:, :, ib] = rgbArray[:, :, 2]  # img[:, :, 0]
-            # # imB = np.zeros(np.shape(im))
-            imB[:, :, ib] = rgbArray[:, :, 0]  # img[:, :, 2]
-            # # imG = np.zeros(np.shape(debayer))
-            imG[:, :, ib] = rgbArray[:, :, 1]  # img[:, :, 1]
-            # #im[:, :, ib] = imag
-            #imGrayCV[:, :, ib] = imGrayscale
-
-            #self.im = im
-            #self.imGrayCV[:, :, ib] = np.uint8(imGrayscale)
+            imR[:, :, ib] = rgbArray[:, :, 2]
+            imB[:, :, ib] = rgbArray[:, :, 0]
+            imG[:, :, ib] = rgbArray[:, :, 1]
+        
             self.imR = imR
             self.imG = imG
             self.imB = imB
 
     def deBayerRawFrameOpenCV(self):
+
+        '''
+        deBayers a raw frame utilizing the package opencv
+        
+        Use this function for debayering into an grayscale
+        image output
+        
+        '''
 
         im = np.zeros(np.shape(self.raw), dtype='uint8')
         self.imGrayCV = np.zeros(np.shape(self.raw), dtype='uint8')
@@ -288,22 +324,15 @@ class cameraIO():
 
                 imGrayscale = cv2.cvtColor(rgbArray, cv2.COLOR_BGR2GRAY)
 
-                # cv2.imshow("cv2version",rgbArray)
-                # imag = Image.fromarray(rgbArray)  # .convert('L')
-                #
-                # # image_enhanced = cv2.equalizeHist(imGray)
-                #
-                # # imR = np.zeros(np.shape(debayer))
-                # imR[:, :, ib] = rgbArray[:, :, 2]  # img[:, :, 0]
-                # # imB = np.zeros(np.shape(im))
-                # imB[:, :, ib] = rgbArray[:, :, 0]  # img[:, :, 2]
-                # # imG = np.zeros(np.shape(debayer))
-                # imG[:, :, ib] = rgbArray[:, :, 1]  # img[:, :, 1]
-                # #im[:, :, ib] = imag
-                #imGrayCV[:, :, ib] = imGrayscale
-
-                #self.im = im
                 self.imGrayCV[:, :, ib] = np.uint8(imGrayscale)
+
+    ''' 
+
+    The following functions are utilized in rectification tasks specific to Argus, 
+    however they are no longer supported and maintained. For further photogrammetry
+    tasks, refer to the corefunctions module within CoastalImageLib. 
+    
+    '''
 
     def uvToXY(self):
         # Do we trust the edges?
@@ -345,34 +374,27 @@ class cameraIO():
         Y = np.divide((np.multiply(np.multiply(M, S) - np.multiply(Q, O), Z) + (np.multiply(Q, P) - np.multiply(M, T))),
                       (np.multiply(Q, N) - np.multiply(M, R)))
 
-        # plt.scatter(X,Y)
-
         self.Xx = np.reshape(X, [(self.vmax - self.vmin), (self.umax - self.umin)])
         self.Yy = np.reshape(Y, [(self.vmax - self.vmin), (self.umax - self.umin)])
         self.X = X
         self.Y = Y
-        ##r = im[vmin:(vmax - 1), umin:(umax - 1), 0]
-        ##g = im[vmin:(vmax - 1), umin:(umax - 1), 1]
-        ##b = im[vmin:(vmax - 1), umin:(umax - 1), 2]
 
     def cropFrames(self):
 
-        #self.rCrop = np.zeros(((self.vmax - self.vmin), (self.umax - self.umin), self.nFrames))
-        #self.bCrop = np.zeros(((self.vmax - self.vmin), (self.umax - self.umin), self.nFrames))
-        #self.gCrop = np.zeros(((self.vmax - self.vmin), (self.umax - self.umin), self.nFrames))
+        '''
+        Function called to crop a debayered frame
+        
+        '''
+
         self.gray = np.zeros(((self.vmax - self.vmin), (self.umax - self.umin), self.nFrames), dtype='uint8')
 
         if self.nFrames == 1:
             self.gray = self.imGrayCV[self.vmin:(self.vmax), self.umin:(self.umax)]
         else:
             for i in range(self.nFrames):
-                #self.rCrop[:, :, i] = self.imR[self.vmin:(self.vmax), self.umin:(self.umax), i]
-                #self.bCrop[:, :, i] = self.imG[self.vmin:(self.vmax), self.umin:(self.umax), i]
-                #self.gCrop[:, :, i] = self.imB[self.vmin:(self.vmax), self.umin:(self.umax), i]
                 self.gray[:, :, i] = self.imGrayCV[self.vmin:(self.vmax), self.umin:(self.umax), i]
 
     def frameInterp(self):
-        #def frameinterp(X, Y, rg, gg, bg):
 
         self.xy = np.zeros([len(self.X), 2])
         self.xy[:, 0] = self.Y.flatten()
