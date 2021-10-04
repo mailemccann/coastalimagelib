@@ -150,7 +150,7 @@ def matchHist(ref,image):
 
     '''
 
-    if len(image.shape) > 2:
+    if (len(image.shape) > 2) & (image.shape[2] > 1):
         # Convert to hsv space
         im_hsv = cv.cvtColor(image, cv.COLOR_RGB2HSV)
         ref_hsv = cv.cvtColor(ref, cv.COLOR_RGB2HSV)
@@ -163,7 +163,7 @@ def matchHist(ref,image):
         matched_hsv[:,:,2] = matched_v
         matched = cv.cvtColor(matched_hsv, cv.COLOR_HSV2RGB)
     else:
-        if len(ref.shape) > 2:
+        if (len(ref.shape) > 2) & (ref.shape[2] > 1):
             ref = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
 
         matched = match_histograms(image, ref, multichannel=False)
