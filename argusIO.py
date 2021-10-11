@@ -4,17 +4,17 @@ import cv2
 import scipy.spatial.qhull as qhull
 
 '''
-Argus specific class and class functions to work with *.raw Argus sensor data 
+Argus specific class and class functions to work with *.raw Argus sensor data
 
 DeBayering workflow:
     1. Initialize cameraIO object
     2. Call readRaw()
     3. Call deBayerRawFrameOpenCV() if grayscale desired
         - Grayscale frame now saved in self.imGray
-                          OR 
+                          OR
        Call deBayerRawFrameOpenCVForColor() if RBG desired
         - RGB components saved in self.imR, self.imG, self.imB
-''' 
+'''
 
 class cameraIO():
     '''
@@ -44,10 +44,10 @@ class cameraIO():
 
     def readRaw(self):
         '''
-        This function is utilized for opening *.raw Argus files prior to a debayering task, 
-        and adds the 
+        This function is utilized for opening *.raw Argus files prior to a debayering task,
+        and adds the
 
-        Must call this function before calling any debayering functions 
+        Must call this function before calling any debayering functions
         '''
         with open(self.rawPath, "rb") as my_file:
             self.fh = my_file
@@ -85,13 +85,13 @@ class cameraIO():
     def readAIIIrawCropped(self):
         
         '''
-        This function reads AIII raw files and populates the self.raw object 
+        This function reads AIII raw files and populates the self.raw object
         by reading the *.raw file frame by frame and adding each to the multi-
-        dimensional array and cropping the frames based on the user defined 
+        dimensional array and cropping the frames based on the user defined
         umin, umax, vmin, vmax
 
-        Attributes: 
-            self.raw: (ndarray) contains all raw sensor data from one camera, 
+        Attributes:
+            self.raw: (ndarray) contains all raw sensor data from one camera,
                 read from self.rawPath
         
         '''
@@ -152,55 +152,73 @@ class cameraIO():
     def readAIIIrawFullFrame(self):
 
         '''
-        This function reads AIII raw files and populates the self.raw object 
+        This function reads AIII raw files and populates the self.raw object
         by reading the *.raw file frame by frame and adding each to the multi-
         dimensional array without cropping the frames
 
-        Attributes: 
-            self.raw: (ndarray) contains all raw sensor data from one camera, 
+        Attributes:
+            self.raw: (ndarray) contains all raw sensor data from one camera,
                 read from self.rawPath
         
         '''
 
-        skipoffset = self.skip*32 + self.skip*self.w*self.h
+        skipoffset = self.skip*32 + self.skip*self.w*self.h  # will set it self to zero
         self.fh.seek(30, 1)
-        if skipoffset > 0:
-            for i in range(self.nFrames):
+        # loop through number of frames 
+        for i in range(self.nFrames):
+            print("Reading frame {}".format(i))
+            if i == 0:
+                binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h, offset=skipoffset)
+            else:
+                binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h, offset=32)
 
-                if i == 0:
-                    binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h, offset=skipoffset)
-                else:
-                    binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h, offset=32)
+            data = np.uint8(binary)
+            del binary
 
-                data = np.uint8(binary)
-                del binary
+            if i == 0:
+                I = data.reshape((self.h, self.w))
+            else:
+                I = np.dstack((I, data.reshape((self.h, self.w))))
 
-                if i == 0:
-                    I = data.reshape((self.h, self.w))
-                else:
-                    I = np.dstack((I, data.reshape((self.h, self.w))))
-
-                del data
-            self.raw = I
-
-        else:
-
-            for i in range(self.nFrames):
-                print("Reading frame {}".format(i))
-                if i == 0:
-                    binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h)
-                else:
-                    binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h, offset=32)
-
-                data = np.uint8(binary)
-                del binary
-                if i == 0:
-                    I = data.reshape((self.h, self.w))
-                else:
-                    I = np.dstack((I, data.reshape((self.h, self.w))))
-
-                del data
-            self.raw = I
+            del data
+        self.raw = I
+        # if skipoffset > 0:
+        #
+        #
+        #     for i in range(self.nFrames):
+        #         print("Reading frame {}".format(i))
+        #         if i == 0:
+        #             binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h, offset=skipoffset)
+        #         else:
+        #             binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h, offset=32)
+        #
+        #         data = np.uint8(binary)
+        #         del binary
+        #
+        #         if i == 0:
+        #             I = data.reshape((self.h, self.w))
+        #         else:
+        #             I = np.dstack((I, data.reshape((self.h, self.w))))
+        #
+        #         del data
+        #     self.raw = I
+        #
+        # else:
+        #     for i in range(self.nFrames):
+        #         if i == 0:
+        #             binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h)
+        #         else:
+        #             binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h, offset=32)
+        #
+        #         data = np.uint8(binary)
+        #         del binary
+        #         if i == 0:
+        #             I = data.reshape((self.h, self.w))
+        #         else:
+        #             I = np.dstack((I, data.reshape((self.h, self.w))))
+        #
+        #         del data
+        #     self.raw = I
 
     def deBayerRawFrame(self):
         '''
@@ -208,7 +226,7 @@ class cameraIO():
         original Matlab code from John Stanley
 
         Attributes:
-            self.imGray: 
+            self.imGray:
         
         '''
 
@@ -254,8 +272,8 @@ class cameraIO():
 
             rgbArray = np.zeros((2048, 2448, 3), 'uint8')
             rgbArray[..., 0] = R
-            rgbArray[..., 1] = G 
-            rgbArray[..., 2] = B 
+            rgbArray[..., 1] = G
+            rgbArray[..., 2] = B
             imGrayscale = cv2.cvtColor(rgbArray, cv2.COLOR_BGR2GRAY)
 
             imGray[:, :, ib] = imGrayscale
@@ -323,14 +341,13 @@ class cameraIO():
                 rgbArray = cv2.cvtColor(framecopy, cv2.COLOR_BayerGB2BGR)
 
                 imGrayscale = cv2.cvtColor(rgbArray, cv2.COLOR_BGR2GRAY)
-
                 self.imGrayCV[:, :, ib] = np.uint8(imGrayscale)
 
-    ''' 
+    '''
 
-    The following functions are utilized in rectification tasks specific to Argus, 
+    The following functions are utilized in rectification tasks specific to Argus,
     however they are no longer supported and maintained. For further photogrammetry
-    tasks, refer to the corefunctions module within CoastalImageLib. 
+    tasks, refer to the corefunctions module within CoastalImageLib.
     
     '''
 
