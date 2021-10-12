@@ -4,17 +4,17 @@ import cv2
 import scipy.spatial.qhull as qhull
 
 '''
-Argus specific class and class functions to work with *.raw Argus sensor data 
+Argus specific class and class functions to work with *.raw Argus sensor data
 
 DeBayering workflow:
     1. Initialize cameraIO object
     2. Call readRaw()
     3. Call deBayerRawFrameOpenCV() if grayscale desired
         - Grayscale frame now saved in self.imGray
-                          OR 
+                          OR
        Call deBayerRawFrameOpenCVForColor() if RBG desired
         - RGB components saved in self.imR, self.imG, self.imB
-''' 
+'''
 
 class cameraIO():
     '''
@@ -32,7 +32,8 @@ class cameraIO():
         self.yMax = kwargs.get('yMax', 1200)
         self.dx = kwargs.get('dx', 1)
         self.skip = kwargs.get('skip', 0)
-
+        self.verbose = kwargs.get('verbose', True)  # turn on/off print statements
+        self.parallel = kwargs.get('parallel', True)
     def getCameraData(self):
 
         '''
@@ -44,10 +45,10 @@ class cameraIO():
 
     def readRaw(self):
         '''
-        This function is utilized for opening *.raw Argus files prior to a debayering task, 
-        and adds the 
+        This function is utilized for opening *.raw Argus files prior to a debayering task,
+        and adds the
 
-        Must call this function before calling any debayering functions 
+        Must call this function before calling any debayering functions
         '''
         with open(self.rawPath, "rb") as my_file:
             self.fh = my_file
@@ -85,13 +86,13 @@ class cameraIO():
     def readAIIIrawCropped(self):
         
         '''
-        This function reads AIII raw files and populates the self.raw object 
+        This function reads AIII raw files and populates the self.raw object
         by reading the *.raw file frame by frame and adding each to the multi-
-        dimensional array and cropping the frames based on the user defined 
+        dimensional array and cropping the frames based on the user defined
         umin, umax, vmin, vmax
 
-        Attributes: 
-            self.raw: (ndarray) contains all raw sensor data from one camera, 
+        Attributes:
+            self.raw: (ndarray) contains all raw sensor data from one camera,
                 read from self.rawPath
         
         '''
@@ -152,12 +153,12 @@ class cameraIO():
     def readAIIIrawFullFrame(self):
 
         '''
-        This function reads AIII raw files and populates the self.raw object 
+        This function reads AIII raw files and populates the self.raw object
         by reading the *.raw file frame by frame and adding each to the multi-
         dimensional array without cropping the frames
 
-        Attributes: 
-            self.raw: (ndarray) contains all raw sensor data from one camera, 
+        Attributes:
+            self.raw: (ndarray) contains all raw sensor data from one camera,
                 read from self.rawPath
         
         '''
@@ -186,7 +187,7 @@ class cameraIO():
         else:
 
             for i in range(self.nFrames):
-                print("Reading frame {}".format(i))
+                if i%20 == 0 and self.verbose==True: print(f"Reading rawFile {i/self.nFrames*100:.1f} %")
                 if i == 0:
                     binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h)
                 else:
@@ -208,7 +209,7 @@ class cameraIO():
         original Matlab code from John Stanley
 
         Attributes:
-            self.imGray: 
+            self.imGray:
         
         '''
 
@@ -254,8 +255,8 @@ class cameraIO():
 
             rgbArray = np.zeros((2048, 2448, 3), 'uint8')
             rgbArray[..., 0] = R
-            rgbArray[..., 1] = G 
-            rgbArray[..., 2] = B 
+            rgbArray[..., 1] = G
+            rgbArray[..., 2] = B
             imGrayscale = cv2.cvtColor(rgbArray, cv2.COLOR_BGR2GRAY)
 
             imGray[:, :, ib] = imGrayscale
@@ -307,30 +308,38 @@ class cameraIO():
         imB = np.zeros(np.shape(self.raw), dtype='uint8')
         imG = np.zeros(np.shape(self.raw), dtype='uint8')
 
-        if self.nFrames == 1:
+        if self.nFrames == 1:  # used for limited memory operations
             frame = self.raw
             framecopy = np.uint8(frame)
             rgbArray = cv2.cvtColor(framecopy, cv2.COLOR_BayerGB2BGR)
 
             imGrayscale = cv2.cvtColor(rgbArray, cv2.COLOR_BGR2GRAY)
             self.imGrayCV[:, :] = np.uint8(imGrayscale)
+        elif self.parallel is True:
+            import multiprocessing as mp
+            pool = mp.Pool(mp.cpu_count() - 1)
+            # https://www.machinelearningplus.com/python/parallel-processing-python/
+            imGrayscale = pool.starmap_async(cv2.cvtColor, [(np.uint8(self.raw[:,:,ib]), cv2.COLOR_BayerGB2GRAY)
+                                                        for ib in range(self.nFrames)]).get()
+            pool.close()
+            self.imGrayCV = np.array(imGrayscale, dtype=np.uint8)
+
         else:
             for ib in range(self.nFrames):
-
-                #print('debayering frame {}'.format(ib))
+                if ib % 20 == 0 and self.verbose==True:
+                    print(f'debayering frame {ib}/{self.nFrames}')
                 frame = self.raw[:, :, ib]
                 framecopy = np.uint8(frame)
                 rgbArray = cv2.cvtColor(framecopy, cv2.COLOR_BayerGB2BGR)
-
                 imGrayscale = cv2.cvtColor(rgbArray, cv2.COLOR_BGR2GRAY)
 
                 self.imGrayCV[:, :, ib] = np.uint8(imGrayscale)
+        
+    '''
 
-    ''' 
-
-    The following functions are utilized in rectification tasks specific to Argus, 
+    The following functions are utilized in rectification tasks specific to Argus,
     however they are no longer supported and maintained. For further photogrammetry
-    tasks, refer to the corefunctions module within CoastalImageLib. 
+    tasks, refer to the corefunctions module within CoastalImageLib.
     
     '''
 
