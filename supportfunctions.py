@@ -209,7 +209,7 @@ def loadJson(jsonfile):
 Argus Functions
 
 '''
-def deBayerArgus(cams,rawPaths,startFrame = 0,savePaths='None'):
+def deBayerArgus(cams, rawPaths, frame = 0, numFrames = 0):
     ''' 
     Requires argusIO
 
@@ -218,10 +218,12 @@ def deBayerArgus(cams,rawPaths,startFrame = 0,savePaths='None'):
 
     Args:
         rawPaths (list of strings): paths from which to load .raw files
-        startFrame (int): frame in .raw file to deBayer
+        frame (int): start frame in .raw file to deBayer
         savePaths (list of strings): optional, paths to save each debayered
             frame to drive as .png, .jpg, etc if desired
             Save paths must include the full filename and file extension
+        numFrames: number of frames to deBayer from start frame ("frame"), 
+            (optional- leave out if only debayering one frame)
 
     Returns: 
         outmat (ndarray): NxMxK matrix of deBayered images, NxM is height 
@@ -230,30 +232,32 @@ def deBayerArgus(cams,rawPaths,startFrame = 0,savePaths='None'):
     Based on argusIO code written by Dylan Anderson. 
 
     '''
-    import argusIO
+    import argusIO_v2
     
     cameras = dict()
+    frames = dict()
 
     for p in range(len(cams)):
 
         # how many raw frames to skip
-        cameras[cams[p]] = argusIO.cameraIO(cameraID=cams[p], rawPath=rawPaths[p],skip=startFrame)
+        cameras[cams[p]] = argusIO_v2.cameraIO(cameraID=cams[p], rawPath=rawPaths[p], startFrame = frame, nFrames = numFrames)
         cameras[cams[p]].readRaw()
-        cameras[cams[p]].deBayerRawFrameOpenCV()
+        cameras[cams[p]].deBayer()
         del cameras[cams[p]].raw
 
-        if p==0:
-            s = cameras[cams[p]].imGrayCV.shape
-            outmat = np.zeros((s[0], s[1], len(cams)))
+        frames[cams[p]] = cameras[cams[p]].imGrayCV
 
-        outmat[:,:,p] = cameras[cams[p]].imGrayCV
-        del cameras[cams[p]].imGrayCV
+    s = frames[cams[0]][:,:,0].shape
+    outmats = np.zeros((s[0], s[1], len(cams), numFrames))
 
-        # Save to drive
-        if savePaths != 'None':
-            cv.imwrite((savePaths[p] + cams[p] + '.jpg'),outmat[:,:,p])  
+    for f in range(numFrames):
+        for p in range(len(cams)):
+            outmats[:,:,p,f] = frames[cams[p]][:,:,f].astype(np.uint8)
 
-    return outmat
+    if numFrames == 0:
+        outmats = outmats[:,:,p]
+        
+    return outmats
 
 def formatArgusFile(cams,folder,epoch):
     '''
@@ -294,6 +298,30 @@ def formatArgusFile(cams,folder,epoch):
     outFile = folder + file + 'merged.avi'
 
     return paths, outFile
+
+def getThreddsTideTp(t):
+
+    import datetime as dt
+    from netCDF4 import Dataset
+    
+    # Get peak period and water level from the thredds server
+    time_obj = dt.datetime.utcfromtimestamp(int(t))
+    hr  =time_obj.hour
+    yr = time_obj.year
+    mon_str = str(str(time_obj.month).zfill(2))
+    ds = Dataset("https://chlthredds.erdc.dren.mil/thredds/dodsC/frf/oceanography/waves/8m-array/" + str(yr) + "/FRF-ocean_waves_8m-array_" + str(yr) + mon_str + ".nc",'r')
+    wave_Tp = (ds.variables["waveTp"][:])
+    waterlevel = (ds.variables["waterLevel"][:])
+    thredds_time = np.asarray(ds.variables["time"][:])
+    ind = np.abs(thredds_time - t).argmin()
+
+    # Peak period
+    Tp = int(np.ceil(wave_Tp[ind]))
+
+    # Water level
+    WL = round(waterlevel[ind],2)
+
+    return Tp, WL
 
 '''
 Misc. Functions
@@ -371,4 +399,5 @@ def avgColor(img):
     av = img.mean(axis=0).mean(axis=0)
     avall = av.mean(axis=0)
     return av, avall
+
 

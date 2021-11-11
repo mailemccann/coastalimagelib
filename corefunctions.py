@@ -786,3 +786,9 @@ class CameraData(object):
         self.t1 = self.intrinsics[9]
         self.t2 = self.intrinsics[10]
 
+
+################################### PARALLEL #################################################
+def rectifyParallel(i, input_frames, cameras, grid):
+    frame = mergeRectify(input_frames, cameras, grid)
+
+    return (i, frame)
