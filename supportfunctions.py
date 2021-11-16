@@ -7,27 +7,27 @@ Supporting Functions:
 
     localTransformPoints(xo, yo, ang, flag, xin, yin)
         - Use this function to transform points in geo coordinates to local
-            if you have the local origin in geo coordinates and angle 
+            if you have the local origin in geo coordinates and angle
             between coordinate systems
         - Similar to Brittany, Chris codes
 
     matIntrinsics2Py(files,tag = 'CIRN')
-        - This function is useful for taking intrinsics and extrinsics 
-            stored in a .mat file in CIRN convention and formatting 
+        - This function is useful for taking intrinsics and extrinsics
+            stored in a .mat file in CIRN convention and formatting
             them to work in this toolbox
 
     getYamlDLT(file,cams)
-        - This function is useful for taking intrinsics and extrinsics 
-            stored in a .yaml file in Argus convention and formatting 
+        - This function is useful for taking intrinsics and extrinsics
+            stored in a .yaml file in Argus convention and formatting
             them to work in this toolbox
-        - If you are using coordinates in DLT / Walton- m vector format, 
+        - If you are using coordinates in DLT / Walton- m vector format,
             you must tag the rectifier using mType = 'DLT'
 
     deBayerArgus(cams,rawPaths,startFrame = 0,savePaths='None')
         - Requires argusIO (import argusIO)
         - This function converts frames at one timestamp for multiple cameras
             stored in .raw files to matrices formatted for use in this toolbox
-        - savePaths = '' allows the user to save each debayered frame to their 
+        - savePaths = '' allows the user to save each debayered frame to their
             drive as .png, .jpg, etc. Save paths must include the full filename
             and file extension
     
@@ -36,7 +36,7 @@ Supporting Functions:
             time at the start of collection and provided camera tags.
         -Also generates the name of the merged file of all cameras
             to save after rectification (although this function doesn't
-            need to be used solely prior to a rectification task). 
+            need to be used solely prior to a rectification task).
 
     initFullFileName(infile,label,type='avi',return_all=False):
         -Function for conveniently creating an outfile name consistent with any
@@ -54,18 +54,18 @@ Transform Functions
 '''
 def localTransformPoints(origin, x_in, y_in, flag):
     '''
-    Transforms points either in geographical coordinates to local, 
+    Transforms points either in geographical coordinates to local,
     or in local to geographical.
     This requires the local origin in geographical coordinates, as well as the
-    angle between coordinate systems in CIRN angle convention. 
+    angle between coordinate systems in CIRN angle convention.
     See the WAMFlow user manual for more information on CIRN angle convention.
 
     Args:
         origin (xo, yo, angle): local origin (0,0) in Geographical coordinates.
                 Typically xo is E and yo is N coordinate.
-                The angle should be the relative angle 
-                between the new (local) X axis  and old (Geo) 
-                X axis, positive counter-clockwise from the old (Geo) X.  
+                The angle should be the relative angle
+                between the new (local) X axis  and old (Geo)
+                X axis, positive counter-clockwise from the old (Geo) X.
         flag = 1 or 0 to indicate transform direction
               Geo-->local (1) or
               local-->Geo (0)
@@ -102,12 +102,12 @@ def localTransformPoints(origin, x_in, y_in, flag):
 
     return x_out, y_out
 
-''' 
+'''
 Intrinsic Functions: Loading and Formatting
 
 '''
 def loadMatCIRN(files,tag = 'CIRN'):
-    ''' 
+    '''
     Requires scipy.io package
 
     This function reads and formats instrinsics from .mat files, in either
@@ -120,9 +120,9 @@ def loadMatCIRN(files,tag = 'CIRN'):
         Note: if CIRN, extrinsics are likely included in .mat file, so I have them in there as well
     
     Returns:
-        m: array of lists, length is number of cameras, each list contains the intrinsics 
+        m: array of lists, length is number of cameras, each list contains the intrinsics
             for the corresponding camera
-        ex: array of lists, length is number of cameras, each list contains the extrinsics 
+        ex: array of lists, length is number of cameras, each list contains the extrinsics
             for the corresponding camera
 
     '''
@@ -156,10 +156,10 @@ def loadMatCIRN(files,tag = 'CIRN'):
     return m,ex
 
 def loadYamlDLT(file,cams):
-    ''' 
+    '''
     Requires yaml package
 
-    This function reads and formats extrinsics and instrinsics in DLT format from 
+    This function reads and formats extrinsics and instrinsics in DLT format from
     .yaml files containing camera data from one or more pre-calibrated
     cameras that are labeled with a camera ID
 
@@ -168,12 +168,12 @@ def loadYamlDLT(file,cams):
         cams: (list of strings) camera labels used in .yaml file
 
     Returns:
-        m: array of lists, length is number of cameras, each list contains the DLT vector 
+        m: array of lists, length is number of cameras, each list contains the DLT vector
             for the corresponding camera
-        ex: array of lists, length is number of cameras, each list contains the extrinsics 
+        ex: array of lists, length is number of cameras, each list contains the extrinsics
             for the corresponding camera
     '''
-    import yaml 
+    import yaml
 
     with open(file, 'r') as f:
         cameraData = yaml.load(f, Loader=yaml.FullLoader)
@@ -210,7 +210,7 @@ Argus Functions
 
 '''
 def deBayerArgus(cams, rawPaths, frame = 0, numFrames = 0):
-    ''' 
+    '''
     Requires argusIO
 
     This function converts frames at one timestamp for multiple cameras
@@ -222,14 +222,14 @@ def deBayerArgus(cams, rawPaths, frame = 0, numFrames = 0):
         savePaths (list of strings): optional, paths to save each debayered
             frame to drive as .png, .jpg, etc if desired
             Save paths must include the full filename and file extension
-        numFrames: number of frames to deBayer from start frame ("frame"), 
+        numFrames: number of frames to deBayer from start frame ("frame"),
             (optional- leave out if only debayering one frame)
 
-    Returns: 
-        outmat (ndarray): NxMxK matrix of deBayered images, NxM is height 
+    Returns:
+        outmat (ndarray): NxMxK matrix of deBayered images, NxM is height
             and width of frame, K is number of cameras
 
-    Based on argusIO code written by Dylan Anderson. 
+    Based on argusIO code written by Dylan Anderson.
 
     '''
     import argusIO_v2
@@ -259,30 +259,32 @@ def deBayerArgus(cams, rawPaths, frame = 0, numFrames = 0):
         
     return outmats
 
-def formatArgusFile(cams,folder,epoch):
+def formatArgusFile(cams,folder,epoch, **kwargs):
     '''
     Generates filenames in Argus convention based on the epoch
     time at the start of collection and provided camera tags.
     Also generates the name of the merged file of all cameras
     to save after rectification (although this function doesn't
-    need to be used solely prior to a rectification task). 
+    need to be used solely prior to a rectification task).
 
     Args:
-        cams (list of strings): camera tag for each camera 
+        cams (list of strings): camera tag for each camera
         epoch (int): epoch/ UTC time at start of collection, MUST be an integer
         folder (string): folder where files are/ will be located.
-
+    Keywork Argument:
+        'outFileBase'(str): this defines the output file name base (default is input file name w/o camera info
     Returns:
         paths (list of strings): string of fullfile names in Argus convention for each camera
-        outFile (string): out filename of the merged file of all cameras; used if going 
+        outFile (string): out filename of the merged file of all cameras; used if going
             into a rectification task
 
-    Note: day_folder (eg: '304_Oct.31/') should not be included in the "folder" string, 
-        as it changes depending on the epoch time. 
+    Note: day_folder (eg: '304_Oct.31/') should not be included in the "folder" string,
+        as it changes depending on the epoch time.
         The day_folder will be generated in this function.
+        
     '''
 
-    import datetime as dt 
+    import datetime as dt
 
     t = dt.datetime.utcfromtimestamp(int(epoch))
     year_start = dt.datetime(t.year, 1, 1)
@@ -295,7 +297,7 @@ def formatArgusFile(cams,folder,epoch):
     file = str(epoch)+ '.'+ day_str+ '.'+ mon_str+ '.'+ str(t.day).zfill(2)+ '_' + \
             str(t.hour).zfill(2)+ '_00_00.GMT.'+ str(t.year)+ '.argus02b.'
     paths = [(folder + day_folder + file + cams[i] + '.raw') for i in range(len(cams))]
-    outFile = folder + file + 'merged.avi'
+    outFile = kwargs.get('outFileBase', folder + file) + 'merged.avi'
 
     return paths, outFile
 
@@ -328,7 +330,7 @@ Misc. Functions
 
 '''
 def initFullFileName(infile,label,type='avi',return_all=False):
-    ''' 
+    '''
     Function for conveniently creating an outfile name consistent with any
     naming convention, given an infile name that contains the naming style
     '''
@@ -337,7 +339,7 @@ def initFullFileName(infile,label,type='avi',return_all=False):
     name = '.'.join(front[-1].split('.')[:-1])
     folder =''
 
-    if len(front) > 1: 
+    if len(front) > 1:
         folder = '/'.join(front[0:-1]) + '/'
 
     outstr = folder + name + '.' + label + '.' + type
