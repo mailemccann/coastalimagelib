@@ -238,15 +238,16 @@ def deBayerArgus(cams, rawPaths, frame = 0, numFrames = 0):
     frames = dict()
 
     for p in range(len(cams)):
+
         # how many raw frames to skip
-        cameras[cams[p]] = argusIO_v2.cameraIO(cameraID=cams[p], rawPath=rawPaths[p], startFrame=frame, nFrames=numFrames)
+        cameras[cams[p]] = argusIO_v2.cameraIO(cameraID=cams[p], rawPath=rawPaths[p], startFrame = frame, nFrames = numFrames)
         cameras[cams[p]].readRaw()
         cameras[cams[p]].deBayer()
         del cameras[cams[p]].raw
 
         frames[cams[p]] = cameras[cams[p]].imGrayCV
 
-    s = frames[cams[0]][:, :, 0].shape
+    s = frames[cams[0]][:,:,0].shape
     outmats = np.zeros((s[0], s[1], len(cams), numFrames))
 
     for f in range(numFrames):
@@ -294,8 +295,8 @@ def formatArgusFile(cams,folder,epoch, **kwargs):
 
     day_folder = jul_str + '_' + mon_str + '.' + str(t.day).zfill(2) + '/'
     file = str(epoch)+ '.'+ day_str+ '.'+ mon_str+ '.'+ str(t.day).zfill(2)+ '_' + \
-            str(t.hour).zfill(2)+ '_00_00.GMT.'+ str(t.year) + '.argus02b.'
-    paths = sorted([(os.path.join(folder, cams[i], day_folder, file + cams[i] + '.raw')) for i in range(len(cams))])
+            str(t.hour).zfill(2)+ '_00_00.GMT.'+ str(t.year)+ '.argus02b.'
+    paths = [(folder + day_folder + file + cams[i] + '.raw') for i in range(len(cams))]
     outFile = kwargs.get('outFileBase', folder + file) + 'merged.avi'
 
     return paths, outFile
