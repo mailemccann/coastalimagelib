@@ -286,7 +286,7 @@ def formatArgusFile(cams,folder,epoch):
 
     t = dt.datetime.utcfromtimestamp(int(epoch))
     year_start = dt.datetime(t.year, 1, 1)
-    jul_str = str((t-year_start).days).zfill(3)
+    jul_str = str((t-year_start).days + 1).zfill(3)
 
     day_str = t.strftime('%a')
     mon_str = t.strftime('%b')

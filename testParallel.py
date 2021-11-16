@@ -1,5 +1,5 @@
 import multiprocessing as mp
-
+import os
 import numpy as np
 import sys
 sys.path.append('C:/Users/mccan/Documents/GitHub/CoastalImageLib')
@@ -11,26 +11,47 @@ import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 if __name__ == '__main__':
-    # Location of our calibration data, stored in a .yaml file 
-    calibration_loc = "C:/Users/mccan/Documents/Projects/FRF/photogrammetry/cameraData.yml"
+    # RAW image locations
+    folder = '/mnt/gaia/peeler/argus/argus02bFullFrame/2021/'
 
-    # Current order of cameras
+    # traverse root directory, and list directories as dirs and files as files
+    epoch = []
+    for root, dirs, files in os.walk(folder):
+        for file in files:
+            if os.path.splitext(file)[1] == '.raw':
+                file_splt = file.split('.')
+                e = int(file_splt[0])
+                epoch.append(e)
+    
+    # Make sure at least two cameras were collecting at that time
+    final_epoch = []
+    for e_ind, e_val in enumerate(epoch):
+        e_count = epoch.count(e_val)
+        if e_count > 1:
+            if e_val not in final_epoch:
+                final_epoch.append(e_val)
+
+    print(sorted(final_epoch))
+
     cams = ['c1','c2','c3','c4','c5','c6']
 
+    numFrames = 120*17  # 2 fps for 17 min
+
+    # Grid boundaries
+    xMin = 0
+    xMax = 500
+    yMin = -200
+    yMax = 1600
+    yamlLoc = '/home/spike/maile/cameraData.yml'
+
     # Call a support function to format .yaml files into CIRN convention
-    m, ex = sf.loadYamlDLT(calibration_loc,cams)
+    m, ex = sf.loadYamlDLT(yamlLoc,cams)
     cameras = np.empty(len(cams),dtype=object)
     for i in range(len(cams)):
         cameras[i] = cf.CameraData(m[i], ex[i], coords = 'local', origin= 'None', mType = 'DLT',nc=1)
 
-    # Current camera tags (camera 4 is camera 0 here)
-    cams = ['1','2','3','4','5','6']
-    folder = 'D:/WAMToolbox/304_Oct.31/'
-    rawPaths = [folder + '1604152800.Sat.Oct.31_14_00_00.GMT.2020.argus02b.c' + i + '.raw' for i in cams]
-    vidfile = folder + '.'.join(rawPaths[0].split('/')[-1].split('.')[:-2]) + '.cx.avi'
-
-    # Grab epoch time
-    t = int(rawPaths[0].split('/')[-1].split('.')[0])
+    paths, outFile = sf.formatArgusFile(cams,folder,val)
+    print(outFile)
     
     # Water level/ rectification z value
     Tp, z = sf.getThreddsTideTp(t)
