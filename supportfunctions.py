@@ -1,6 +1,7 @@
 import numpy as np
 import cv2 as cv
-
+import os
+import datetime as dt
 
 '''
 Supporting Functions:
@@ -247,9 +248,9 @@ def deBayerArgus(cams, rawPaths, frame = 0, numFrames = 0):
         frames[cams[p]] = cameras[cams[p]].imGrayCV
 
     s = frames[cams[0]][:, :, 0].shape
-    outmats = np.zeros((s[0], s[1], len(cams), numFrames))
+    outmats = np.zeros((s[0], s[1], len(cams), cameras['c1'].nFrames), dtype=np.uint8)
 
-    for f in range(numFrames):
+    for f in range(cameras['c1'].nFrames):
         for p in range(len(cams)):
             outmats[:,:,p,f] = frames[cams[p]][:,:,f].astype(np.uint8)
 
@@ -283,11 +284,9 @@ def formatArgusFile(cams,folder,epoch, **kwargs):
         
     '''
 
-    import datetime as dt
-
     t = dt.datetime.utcfromtimestamp(int(epoch))
     year_start = dt.datetime(t.year, 1, 1)
-    jul_str = str((t-year_start).days).zfill(3)
+    jul_str = str((t-year_start).days + 1).zfill(3)
 
     day_str = t.strftime('%a')
     mon_str = t.strftime('%b')
