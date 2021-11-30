@@ -259,6 +259,60 @@ def deBayerArgus(cams, rawPaths, frame = 0, numFrames = 0):
         
     return outmats
 
+def deBayerParallel(i, cams, rawPaths, frame = 0, numFrames = 0):
+    '''
+    Requires argusIO
+
+    This function converts frames at one timestamp for multiple cameras
+    stored in .raw files to matrices formatted for use in this toolbox
+
+    Args:
+        rawPaths (list of strings): paths from which to load .raw files
+        frame (int): start frame in .raw file to deBayer
+        savePaths (list of strings): optional, paths to save each debayered
+            frame to drive as .png, .jpg, etc if desired
+            Save paths must include the full filename and file extension
+        numFrames: number of frames to deBayer from start frame ("frame"),
+            (optional- leave out if only debayering one frame)
+
+    Returns:
+        outmat (ndarray): NxMxK matrix of deBayered images, NxM is height
+            and width of frame, K is number of cameras
+
+    Based on argusIO code written by Dylan Anderson.
+
+    '''
+    import argusIO_v2
+    import multiprocessing as mp
+    
+    cameras = dict()
+    frames = dict()
+
+    pool = mp.Pool(mp.cpu_count())
+    results = []
+
+    for p in range(len(cams)):
+        # how many raw frames to skip
+        cameras[cams[p]] = argusIO_v2.cameraIO(cameraID=cams[p], rawPath=rawPaths[p], startFrame=frame, nFrames=numFrames)
+        pool.apply_async(cameras[cams[p]].readRaw())
+
+    pool.close()
+    pool.join() 
+    
+    for p in range(len(cams)):
+        cameras[cams[p]].deBayer()
+        del cameras[cams[p]].raw
+        frames[cams[p]] = cameras[cams[p]].imGrayCV
+
+    s = frames[cams[0]][:, :, 0].shape
+    outmats = np.zeros((s[0], s[1], len(cams), numFrames))
+
+    for p in range(len(cams)):
+        outmats[:,:,p,:] = frames[cams[p]][:,:,:].astype(np.uint8)
+
+    return outmats
+
+
 def formatArgusFile(cams,folder,epoch, **kwargs):
     '''
     Generates filenames in Argus convention based on the epoch
@@ -286,18 +340,19 @@ def formatArgusFile(cams,folder,epoch, **kwargs):
 
     t = dt.datetime.utcfromtimestamp(int(epoch))
     year_start = dt.datetime(t.year, 1, 1)
-    jul_str = str((t-year_start).days + 1).zfill(3)
 
+    jul_str = str((t-year_start).days + 1).zfill(3)
     day_str = t.strftime('%a')
     mon_str = t.strftime('%b')
 
     day_folder = jul_str + '_' + mon_str + '.' + str(t.day).zfill(2) + '/'
-    file = str(epoch)+ '.'+ day_str+ '.'+ mon_str+ '.'+ str(t.day).zfill(2)+ '_' + \
-            str(t.hour).zfill(2)+ '_00_00.GMT.'+ str(t.year) + '.argus02b.'
-    paths = sorted([(os.path.join(folder, cams[i], day_folder, file + cams[i] + '.raw')) for i in range(len(cams))])
-    outFile = kwargs.get('outFileBase', folder + file) + 'merged.avi'
+    file = str(epoch)+ '.' + day_str+ '.' + mon_str + '.' + str(t.day).zfill(2) + '_' + \
+            str(t.hour).zfill(2) + '_' + str(t.minute).zfill(2) + '_00.GMT.' + str(t.year) + '.argus02b.'
+    paths = [(folder + cams[i] + '/' + day_folder + file + cams[i] + '.raw') for i in range(len(cams))]
+    outFile = file + 'cx.avi'
 
     return paths, outFile
+
 
 def getThreddsTideTp(t):
 
