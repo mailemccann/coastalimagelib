@@ -2,17 +2,17 @@ import numpy as np
 import cv2
 
 '''
-Argus specific class and class functions to work with *.raw Argus sensor data 
+Argus specific class and class functions to work with *.raw Argus sensor data
 
 DeBayering workflow:
     1. Initialize cameraIO object
     2. Call readRaw()
     3. Call deBayer()
         - Grayscale frame now saved in self.imGray
-                          OR 
+                          OR
        Call deBayer(rgb=True) if RBG desired
         - RGB components saved in self.imR, self.imG, self.imB
-''' 
+'''
 
 class cameraIO():
     '''
@@ -27,10 +27,10 @@ class cameraIO():
 
     def readRaw(self):
         '''
-        This function is utilized for opening *.raw Argus files prior to a debayering task, 
-        and adds the 
+        This function is utilized for opening *.raw Argus files prior to a debayering task,
+        and adds the
 
-        Must call this function before calling any debayering functions 
+        Must call this function before calling any debayering functions
         '''
         with open(self.rawPath, "rb") as my_file:
             self.fh = my_file
@@ -68,12 +68,12 @@ class cameraIO():
     def readAIIIrawFullFrame(self):
 
         '''
-        This function reads AIII raw files and populates the self.raw object 
+        This function reads AIII raw files and populates the self.raw object
         by reading the *.raw file frame by frame and adding each to the multi-
         dimensional array without cropping the frames
 
-        Attributes: 
-            self.raw: (ndarray) contains all raw sensor data from one camera, 
+        Attributes:
+            self.raw: (ndarray) contains all raw sensor data from one camera,
                 read from self.rawPath
         
         '''
@@ -107,8 +107,15 @@ class cameraIO():
                 else:
                     binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h, offset=32)
 
-                data = np.uint8(binary)
+                data = np.uint8(binary)  # i think this is redundant to above with dtype argument of np.uint8
                 del binary
+                
+                if len(data) == 0:
+                    # here adjust our frame count to what is accurate then break out of the loop
+                    # and continue processing as normal
+                    self.nFrames = i
+                    break
+
                 if i == 0:
                     I = data.reshape((self.h, self.w))
                 else:
