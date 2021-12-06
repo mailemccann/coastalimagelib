@@ -69,7 +69,7 @@ if __name__ == '__main__':
     nframes = 12 #17*60*2
 
     ts = time.time()
-    outmats = sf.deBayerArgus(cams, rawPaths, frame = 0, numFrames = nframes)
+    outmats = sf.deBayerArgusParallel(cams, paths, frame = 0, numFrames = nframes)
     print('Time to debayer: ' + str(time.time() - ts))
 
     ts = time.time()

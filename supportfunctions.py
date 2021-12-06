@@ -325,7 +325,9 @@ def formatArgusFile(cams,folder,epoch, **kwargs):
         epoch (int): epoch/ UTC time at start of collection, MUST be an integer
         folder (string): folder where files are/ will be located.
     Keywork Argument:
-        'outFileBase'(str): this defines the output file name base (default is input file name w/o camera info
+        'outFileBase'(str): this defines the output file name base (default is input file name w/o camera info)
+        - overwrites the automatic argus file naming convention
+        - add full file name and file extension
     Returns:
         paths (list of strings): string of fullfile names in Argus convention for each camera
         outFile (string): out filename of the merged file of all cameras; used if going
@@ -347,10 +349,13 @@ def formatArgusFile(cams,folder,epoch, **kwargs):
     mon_str = t.strftime('%b')
 
     day_folder = jul_str + '_' + mon_str + '.' + str(t.day).zfill(2) + '/'
-    file = str(epoch)+ '.' + day_str+ '.' + mon_str + '.' + str(t.day).zfill(2) + '_' + \
-            str(t.hour).zfill(2) + '_' + str(t.minute).zfill(2) + '_00.GMT.' + str(t.year) + '.argus02b.'
+    file = str(epoch)+ '.' + day_str + '.' + mon_str + '.' + str(t.day).zfill(2) + '_' + \
+            str(t.hour).zfill(2) + '_' + str(t.minute).zfill(2) + '_' + \
+            str(t.second).zfill(2) + '.GMT.' + str(t.year) + '.argus02b.'
     paths = [(folder + cams[i] + '/' + day_folder + file + cams[i] + '.raw') for i in range(len(cams))]
-    outFile = file + 'cx.avi'
+
+    out_path = kwargs.get('outFileBase', '')
+    outFile = out_path + str(t.day).zfill(2) + '_' + str(t.hour).zfill(2) + '_' + str(t.minute).zfill(2)
 
     return paths, outFile
 

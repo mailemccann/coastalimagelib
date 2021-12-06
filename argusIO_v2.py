@@ -117,7 +117,7 @@ class cameraIO():
                 del data
             self.raw = I
 
-    def deBayer(self, rgb = False):
+    def deBayer(self, rgb = False, parallel = False):
         '''
         deBayers a raw frame utilizing the package opencv
         
