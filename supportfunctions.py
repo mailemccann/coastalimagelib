@@ -354,7 +354,7 @@ def formatArgusFile(cams,folder,epoch, **kwargs):
     paths = [(folder + cams[i] + '/' + day_folder + file + cams[i] + '.raw') for i in range(len(cams))]
 
     out_path = kwargs.get('outFileBase', '')
-    outFile = out_path + str(t.day).zfill(2) + '_' + str(t.hour).zfill(2) + '_' + str(t.minute).zfill(2)
+    outFile = out_path + str(t.day).zfill(2) + '_' + str(t.hour).zfill(2) + '_' + str(t.minute).zfill(2) + '_merged.avi'
 
     return paths, outFile
 
