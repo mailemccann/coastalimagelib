@@ -247,15 +247,20 @@ def deBayerArgus(cams, rawPaths, frame = 0, numFrames = 0):
 
         frames[cams[p]] = cameras[cams[p]].imGrayCV
 
-    s = frames[cams[0]][:, :, 0].shape
-    outmats = np.zeros((s[0], s[1], len(cams), cameras['c1'].nFrames), dtype=np.uint8)
+    if numFrames > 1:
+        s = frames[cams[0]][:, :, 0].shape
+        outmats = np.zeros((s[0], s[1], len(cams), cameras['c1'].nFrames), dtype=np.uint8)
 
-    for f in range(cameras['c1'].nFrames):
+        for f in range(cameras['c1'].nFrames):
+            for p in range(len(cams)):
+                outmats[:,:,p,f] = frames[cams[p]][:,:,f].astype(np.uint8)
+    else:
+        s = frames[cams[0]].shape
+        outmats = np.zeros((s[0], s[1], len(cams)), dtype=np.uint8)
+
         for p in range(len(cams)):
-            outmats[:,:,p,f] = frames[cams[p]][:,:,f].astype(np.uint8)
+            outmats[:,:,p] = frames[cams[p]].astype(np.uint8)
 
-    if numFrames == 0:
-        outmats = outmats[:,:,p]
         
     return outmats
 
