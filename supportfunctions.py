@@ -1,6 +1,7 @@
 import numpy as np
 import cv2 as cv
-
+import os
+import datetime as dt
 
 '''
 Supporting Functions:
@@ -238,26 +239,84 @@ def deBayerArgus(cams, rawPaths, frame = 0, numFrames = 0):
     frames = dict()
 
     for p in range(len(cams)):
-
         # how many raw frames to skip
-        cameras[cams[p]] = argusIO_v2.cameraIO(cameraID=cams[p], rawPath=rawPaths[p], startFrame = frame, nFrames = numFrames)
+        cameras[cams[p]] = argusIO_v2.cameraIO(cameraID=cams[p], rawPath=rawPaths[p], startFrame=frame, nFrames=numFrames)
         cameras[cams[p]].readRaw()
         cameras[cams[p]].deBayer()
         del cameras[cams[p]].raw
 
         frames[cams[p]] = cameras[cams[p]].imGrayCV
 
-    s = frames[cams[0]][:,:,0].shape
-    outmats = np.zeros((s[0], s[1], len(cams), numFrames))
+    if numFrames > 1:
+        s = frames[cams[0]][:, :, 0].shape
+        outmats = np.zeros((s[0], s[1], len(cams), cameras['c1'].nFrames), dtype=np.uint8)
 
-    for f in range(numFrames):
+        for f in range(cameras['c1'].nFrames):
+            for p in range(len(cams)):
+                outmats[:,:,p,f] = frames[cams[p]][:,:,f].astype(np.uint8)
+    else:
+        s = frames[cams[0]].shape
+        outmats = np.zeros((s[0], s[1], len(cams)), dtype=np.uint8)
+
         for p in range(len(cams)):
-            outmats[:,:,p,f] = frames[cams[p]][:,:,f].astype(np.uint8)
+            outmats[:,:,p] = frames[cams[p]].astype(np.uint8)
 
-    if numFrames == 0:
-        outmats = outmats[:,:,p]
         
     return outmats
+
+def deBayerParallel(i, cams, rawPaths, frame = 0, numFrames = 0):
+    '''
+    Requires argusIO
+
+    This function converts frames at one timestamp for multiple cameras
+    stored in .raw files to matrices formatted for use in this toolbox
+
+    Args:
+        rawPaths (list of strings): paths from which to load .raw files
+        frame (int): start frame in .raw file to deBayer
+        savePaths (list of strings): optional, paths to save each debayered
+            frame to drive as .png, .jpg, etc if desired
+            Save paths must include the full filename and file extension
+        numFrames: number of frames to deBayer from start frame ("frame"),
+            (optional- leave out if only debayering one frame)
+
+    Returns:
+        outmat (ndarray): NxMxK matrix of deBayered images, NxM is height
+            and width of frame, K is number of cameras
+
+    Based on argusIO code written by Dylan Anderson.
+
+    '''
+    import argusIO_v2
+    import multiprocessing as mp
+    
+    cameras = dict()
+    frames = dict()
+
+    pool = mp.Pool(mp.cpu_count())
+    results = []
+
+    for p in range(len(cams)):
+        # how many raw frames to skip
+        cameras[cams[p]] = argusIO_v2.cameraIO(cameraID=cams[p], rawPath=rawPaths[p], startFrame=frame, nFrames=numFrames)
+        pool.apply_async(cameras[cams[p]].readRaw())
+
+    pool.close()
+    pool.join() 
+    
+    for p in range(len(cams)):
+        cameras[cams[p]].deBayer()
+        del cameras[cams[p]].raw
+        frames[cams[p]] = cameras[cams[p]].imGrayCV
+
+    s = frames[cams[0]][:, :, 0].shape
+    outmats = np.zeros((s[0], s[1], len(cams), numFrames))
+
+    for p in range(len(cams)):
+        outmats[:,:,p,:] = frames[cams[p]][:,:,:].astype(np.uint8)
+
+    return outmats
+
 
 def formatArgusFile(cams,folder,epoch, **kwargs):
     '''
@@ -272,7 +331,9 @@ def formatArgusFile(cams,folder,epoch, **kwargs):
         epoch (int): epoch/ UTC time at start of collection, MUST be an integer
         folder (string): folder where files are/ will be located.
     Keywork Argument:
-        'outFileBase'(str): this defines the output file name base (default is input file name w/o camera info
+        'outFileBase'(str): this defines the output file name base (default is input file name w/o camera info)
+        - overwrites the automatic argus file naming convention
+        - add full file name and file extension
     Returns:
         paths (list of strings): string of fullfile names in Argus convention for each camera
         outFile (string): out filename of the merged file of all cameras; used if going
@@ -284,44 +345,74 @@ def formatArgusFile(cams,folder,epoch, **kwargs):
         
     '''
 
-    import datetime as dt
-
     t = dt.datetime.utcfromtimestamp(int(epoch))
-    year_start = dt.datetime(t.year, 1, 1)
-    jul_str = str((t-year_start).days).zfill(3)
 
+    year_start = dt.datetime(t.year, 1, 1)
+
+    jul_str = str((t-year_start).days + 1).zfill(3)
     day_str = t.strftime('%a')
     mon_str = t.strftime('%b')
 
-    day_folder = jul_str + '_' + mon_str + '.' + str(t.day).zfill(2) + '/'
-    file = str(epoch)+ '.'+ day_str+ '.'+ mon_str+ '.'+ str(t.day).zfill(2)+ '_' + \
-            str(t.hour).zfill(2)+ '_00_00.GMT.'+ str(t.year)+ '.argus02b.'
-    paths = [(folder + day_folder + file + cams[i] + '.raw') for i in range(len(cams))]
-    outFile = kwargs.get('outFileBase', folder + file) + 'merged.avi'
+    day_folder = os.path.join(jul_str + '_' + mon_str + '.' + str(t.day).zfill(2), "")
+    file = str(epoch)+ '.' + day_str + '.' + mon_str + '.' + str(t.day).zfill(2) + '_' + \
+            str(t.hour).zfill(2) + '_' + str(t.minute).zfill(2) + '_' + \
+            str(t.second).zfill(2) + '.GMT.' + str(t.year) + '.argus02b.'
+    paths = [os.path.join(folder, cams[i], (day_folder + file + cams[i] + '.raw')) for i in range(len(cams))]
+
+    out_path = kwargs.get('outFileBase', '')
+    outFile = out_path + str(t.day).zfill(2) + '_' + str(t.hour).zfill(2) + '_' + str(t.minute).zfill(2) + '_merged.avi'
 
     return paths, outFile
 
-def getThreddsTideTp(t):
 
+def getThreddsTideTp(t):
+    '''
+    Get peak period and water level from the FRF thredds server
+
+    Tries EOP first for water level, if doesn't work, uses 8m array
+
+    Args:
+        t: time in epoch (int)
+    Returns: 
+        Tp: Peak period (float)
+        WL: water level (float)
+    '''
     import datetime as dt
     from netCDF4 import Dataset
     
-    # Get peak period and water level from the thredds server
     time_obj = dt.datetime.utcfromtimestamp(int(t))
     hr  =time_obj.hour
     yr = time_obj.year
     mon_str = str(str(time_obj.month).zfill(2))
-    ds = Dataset("https://chlthredds.erdc.dren.mil/thredds/dodsC/frf/oceanography/waves/8m-array/" + str(yr) + "/FRF-ocean_waves_8m-array_" + str(yr) + mon_str + ".nc",'r')
+
+    # Peak period Dataset
+    ds = Dataset("https://chlthredds.erdc.dren.mil/thredds/dodsC/frf/oceanography/waves/8m-array/" + \
+                    str(yr) + "/FRF-ocean_waves_8m-array_" + str(yr) + mon_str + ".nc",'r')
     wave_Tp = (ds.variables["waveTp"][:])
-    waterlevel = (ds.variables["waterLevel"][:])
-    thredds_time = np.asarray(ds.variables["time"][:])
-    ind = np.abs(thredds_time - t).argmin()
+    thredds_time_Tp = np.asarray(ds.variables["time"][:])
+
+    # Water Level Dataset
+    try: 
+        # Try EOP
+        ds2 = Dataset("https://chlthredds.erdc.dren.mil/thredds/dodsC/frf/oceanography/waterlevel/eopNoaaTide/" + \
+                    str(yr) + "/FRF-ocean_waterlevel_eopNoaaTide_" + str(yr) + mon_str + ".nc",'r')
+        waterlevel = (ds2.variables["waterLevel"][:])
+        thredds_time_WL = np.asarray(ds2.variables["time"][:])
+        print('Water level sourced from EOP')
+    except: 
+        # If no EOP, grab from 8m array
+        waterlevel = (ds.variables["waterLevel"][:])
+        thredds_time_WL = np.asarray(ds.variables["time"][:])
+        print('Water level sourced from 8m array')
+
+    ind_WL = np.abs(thredds_time_WL - t).argmin()
+    ind_Tp = np.abs(thredds_time_Tp - t).argmin()
 
     # Peak period
-    Tp = int(np.ceil(wave_Tp[ind]))
+    Tp = int(np.ceil(wave_Tp[ind_Tp]))
 
     # Water level
-    WL = round(waterlevel[ind],2)
+    WL = round(waterlevel[ind_WL],2)
 
     return Tp, WL
 
