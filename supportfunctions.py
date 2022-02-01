@@ -346,17 +346,18 @@ def formatArgusFile(cams,folder,epoch, **kwargs):
     '''
 
     t = dt.datetime.utcfromtimestamp(int(epoch))
+
     year_start = dt.datetime(t.year, 1, 1)
 
     jul_str = str((t-year_start).days + 1).zfill(3)
     day_str = t.strftime('%a')
     mon_str = t.strftime('%b')
 
-    day_folder = jul_str + '_' + mon_str + '.' + str(t.day).zfill(2) + '/'
+    day_folder = os.path.join(jul_str + '_' + mon_str + '.' + str(t.day).zfill(2), "")
     file = str(epoch)+ '.' + day_str + '.' + mon_str + '.' + str(t.day).zfill(2) + '_' + \
             str(t.hour).zfill(2) + '_' + str(t.minute).zfill(2) + '_' + \
             str(t.second).zfill(2) + '.GMT.' + str(t.year) + '.argus02b.'
-    paths = [(folder + cams[i] + '/' + day_folder + file + cams[i] + '.raw') for i in range(len(cams))]
+    paths = [os.path.join(folder, cams[i], (day_folder + file + cams[i] + '.raw')) for i in range(len(cams))]
 
     out_path = kwargs.get('outFileBase', '')
     outFile = out_path + str(t.day).zfill(2) + '_' + str(t.hour).zfill(2) + '_' + str(t.minute).zfill(2) + '_merged.avi'
