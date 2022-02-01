@@ -402,7 +402,8 @@ def rectVideos(video_list, cameras, grid, numFrames):
         if i ==0:
             # Create videowriter object to save video to drive
             outFile = initFullFileName(video_list[0],'video_capture.rect',type='avi')
-            result = cv.VideoWriter(outFile,cv.VideoWriter_fourcc('M','J','P','G'),
+            fourcc = cv.VideoWriter_fourcc(*'FMP4')
+            result = cv.VideoWriter(outFile,fourcc,
                                     fps, (merged.shape[1],merged.shape[0]),1)
             # Initialize array of images
             rect_arr = merged.astype(np.uint8)
