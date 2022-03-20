@@ -351,7 +351,7 @@ def deBayerParallel(i, cams, rawPaths, frame=0, numFrames=0):
     return outmats
 
 
-def formatArgusFile(cams, folder, epoch, **kwargs):
+def formatArgusFile(cams, folder, epoch, folder_tag = True, file_ext = '.raw', **kwargs):
     """
     Generates filenames in Argus convention based on the epoch
     time at the start of collection and provided camera tags.
@@ -369,6 +369,8 @@ def formatArgusFile(cams, folder, epoch, **kwargs):
             default is input file name without camera info
                 - overwrites the automatic argus file naming convention
                 - add full file name and file extension
+        'folder_tag'(bool): set to 'False' if folders
+            should not be included in full file path
     Returns:
         paths (list of strings): string of fullfile names in Argus
             convention for each camera
@@ -413,10 +415,17 @@ def formatArgusFile(cams, folder, epoch, **kwargs):
         + str(t.year)
         + ".argus02b."
     )
-    paths = [
-        os.path.join(folder, cams[i], (day_folder + file + cams[i] + ".raw"))
-        for i in range(len(cams))
-    ]
+
+    if folder_tag:
+        paths = [
+            os.path.join(folder, cams[i], (day_folder + file + cams[i] + file_ext))
+            for i in range(len(cams))
+        ]
+    else:
+        paths = [
+            os.path.join((file + cams[i] + file_ext))
+            for i in range(len(cams))
+        ]
 
     out_path = kwargs.get("outFileBase", "")
     outFile = (

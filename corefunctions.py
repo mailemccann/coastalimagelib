@@ -549,7 +549,7 @@ def pixelStack(frames, grid, cameras, disp_flag=0):
     return pixels
 
 
-def imageStats(im_mat, save_flag=0):
+def imageStats(im_mat, save_flag=0, disp_flag=0):
     """
     This function generates statistical image products for a given set of
     images and corresponding extrinsics/intrinsics. The statistical image
@@ -583,11 +583,20 @@ def imageStats(im_mat, save_flag=0):
         cv.imwrite("Timex.jpg", Timex)
         cv.imwrite("Variance.jpg", Variance)
 
-    cv.imshow("Darkest", Dark)
-    cv.imshow("Brightest", Bright)
-    cv.imshow("Timex", Timex)
-    cv.imshow("Variance", Variance)
-    cv.waitKey(0)
+    if disp_flag:
+        fig, axs = plt.subplots(1, 4)
+        titles = ['Dark','Bright','Timex','Variance']
+        for k, im in enumerate([Dark,Bright,Timex,Variance]):
+            axs[k].xaxis.set_visible(False)
+            axs[k].yaxis.set_visible(False)
+            axs[k].set_title(titles[k])
+            axs[k].imshow(
+                im.astype(np.uint8),
+                cmap="gray",
+                vmin=0,
+                vmax=255
+                )
+        plt.show()
 
 
 """
