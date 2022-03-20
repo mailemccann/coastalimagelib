@@ -6,12 +6,12 @@ CoastalImageLib is a Python- based library that produces common coastal image pr
 
 The following list depicts the library structure for CoastalImageLib, expressed in terms of a hierarchical filesystem. Any classes contained in each .py file are included in italics. Modules, as well as the functions they contain, do not require a specific order in which to be implemented. Suggested workflows are included in the Illustrative Example Script Jupyter notebook contained in the CoastalImageLib repository. Detailed descriptions of each module can be found in the following Software Functionalities section.
 
-**CoastalImageLib**
-    corefunctions.py
-        *class XYZGrid*
-        *class CameraData*
-    supportfunctions.py
-    argusIO.py
+    **CoastalImageLib**
+        corefunctions.py
+            *class XYZGrid*
+            *class CameraData*
+        supportfunctions.py
+        argusIO.py
     
 The main user- interactive module is **corefunctions.py**. Two classes are contained in this module: XYZGrid() and CameraData(). These classes bundle data and functionality vital to the rectification process. XYZGrid() holds the real world target grid on which rectification or pixel subsampling will take place. CameraData() holds camera calibration values, and contains a function for extrinsic value transforms, and a function for calculating camera matrices. Users must initialize instances of these classes for each desired rectification grid, and each calibrated camera.
 
