@@ -25,9 +25,7 @@ requirements:
     - scikit-image
     - scikit-learn
     - netCDF4
-    - json
-    - multiprocessing
-    - datetime
+    - multiprocess
     - xarray
 
 about:
