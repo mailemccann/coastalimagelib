@@ -1,5 +1,5 @@
- from setuptools import setup
- import conda_build.bdist_conda
+from setuptools import setup
+import conda_build.bdist_conda
 
 setup(
     name="coastalimagelib",
