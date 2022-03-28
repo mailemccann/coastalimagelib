@@ -1,9 +1,26 @@
 from setuptools import setup
-import conda_build.bdist_conda
 
 setup(
     name="coastalimagelib",
     version="v1.0.0",
-    distclass=conda_build.bdist_conda.CondaDistribution,
-    conda_buildnum=1,
+    author="Maile P. McCann",
+    author_email="mailemcc@usc.ed",
+    url="https://github.com/mailemccann/coastalimagelib",
+    license="MIT",
+    packages=['coastalimagelib'],
+    description="Package for creating coastal image products.",
+    install_requires=['imageio',
+                    'matplotlib',
+                    'numpy',
+                    'opencv',
+                    'jupyter',
+                    'ipykernel',
+                    'scikit-image',
+                    'scipy',
+                    'scikit-image',
+                    'scikit-learn',
+                    'netCDF4',
+                    'multiprocess',
+                    'xarray',
+                    ]
 )

@@ -3,8 +3,7 @@ package:
   version: "1.0.0"
 
 source:
-  git_rev: v1.0.0
-  git_url: https://github.com/mailemccann/CoastalImageLib
+  path: C:/Users/mccan/Dropbox/PC/Documents/coastalimagelib
 
 requirements:
   host:
@@ -12,6 +11,7 @@ requirements:
     - setuptools
   build:
     - python
+    - setuptools
   run:
     - python
     - imageio
