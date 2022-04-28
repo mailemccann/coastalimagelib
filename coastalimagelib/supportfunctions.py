@@ -350,9 +350,8 @@ def deBayerParallel(i, cams, rawPaths, frame=0, numFrames=0):
 
     return outmats
 
-
-def formatArgusFile(cams, folder, epoch, folder_tag = True, file_ext = '.raw', **kwargs):
-    """
+def formatArgusFile(cams, folder, epoch, **kwargs):
+    '''
     Generates filenames in Argus convention based on the epoch
     time at the start of collection and provided camera tags.
     Also generates the name of the merged file of all cameras
@@ -361,82 +360,39 @@ def formatArgusFile(cams, folder, epoch, folder_tag = True, file_ext = '.raw', *
 
     Args:
         cams (list of strings): camera tag for each camera
-        epoch (int): epoch/ UTC time at start of collection,
-            MUST be an integer
+        epoch (int): epoch/ UTC time at start of collection, MUST be an integer
         folder (string): folder where files are/ will be located.
     Keywork Argument:
-        'outFileBase'(str): this defines the output file name base,
-            default is input file name without camera info
-                - overwrites the automatic argus file naming convention
-                - add full file name and file extension
-        'folder_tag'(bool): set to 'False' if folders
-            should not be included in full file path
+        'outFileBase'(str): this defines the output file name base (default is input file name w/o camera info)
+        - overwrites the automatic argus file naming convention
+        - add full file name and file extension
     Returns:
-        paths (list of strings): string of fullfile names in Argus
-            convention for each camera
-        outFile (string): out filename of the merged file of all cameras;
-            used if going into a rectification task
+        paths (list of strings): string of fullfile names in Argus convention for each camera
+        outFile (string): out filename of the merged file of all cameras; used if going
+            into a rectification task
 
-    Note: day_folder (eg: '304_Oct.31/') should not be included in the
-        "folder" string, as it changes depending on the epoch time.
+    Note: day_folder (eg: '304_Oct.31/') should not be included in the "folder" string,
+        as it changes depending on the epoch time.
         The day_folder will be generated in this function.
+        
+    '''
+    import netCDF4 as nc
+    t = nc.num2date(epoch, 'seconds since 1970-01-01', only_use_python_datetimes=True, only_use_cftime_datetimes=False)
+    # t = dt.datetime.fromtimestamp(int(epoch))   # this is local time
+    year_start = dt.datetime(t.year, 1, 1, tzinfo=pytz.timezone('America/New_York') )
 
-    """
+    jul_str = str(t.timetuple().tm_yday).zfill(3)  # str((t-year_start).days + 1).zfill(3)
+    day_str = t.strftime('%a')
+    mon_str = t.strftime('%b')
 
-    t = dt.datetime.utcfromtimestamp(int(epoch))
+    day_folder = jul_str + '_' + mon_str + '.' + str(t.day).zfill(2) + '/'
+    file = f"{epoch}.{t.strftime('%a')}.{t.strftime('%b')}." \
+           f"{t.strftime('%d_%H_%M_%S')}.GMT" \
+           f".{t.strftime('%Y')}.argus02b."
+    paths = [(folder + cams[i] + '/' + day_folder + file + cams[i] + '.raw') for i in range(len(cams))]
 
-    year_start = dt.datetime(t.year, 1, 1)
-
-    jul_str = str((t - year_start).days + 1).zfill(3)
-    day_str = t.strftime("%a")
-    mon_str = t.strftime("%b")
-
-    day_folder = os.path.join((jul_str
-                              + "_"
-                              + mon_str
-                              + "."
-                              + str(t.day).zfill(2)),
-                              "")
-    file = (
-        str(epoch)
-        + "."
-        + day_str
-        + "."
-        + mon_str
-        + "."
-        + str(t.day).zfill(2)
-        + "_"
-        + str(t.hour).zfill(2)
-        + "_"
-        + str(t.minute).zfill(2)
-        + "_"
-        + str(t.second).zfill(2)
-        + ".GMT."
-        + str(t.year)
-        + ".argus02b."
-    )
-
-    if folder_tag:
-        paths = [
-            os.path.join(folder, cams[i], (day_folder + file + cams[i] + file_ext))
-            for i in range(len(cams))
-        ]
-    else:
-        paths = [
-            os.path.join((file + cams[i] + file_ext))
-            for i in range(len(cams))
-        ]
-
-    out_path = kwargs.get("outFileBase", "")
-    outFile = (
-        out_path
-        + str(t.day).zfill(2)
-        + "_"
-        + str(t.hour).zfill(2)
-        + "_"
-        + str(t.minute).zfill(2)
-        + "_merged.avi"
-    )
+    outFile = os.path.join(kwargs.get('outFileBase', folder),
+                    f"ArgusFF_{t.strftime('%Y%m%dT%H%M%SZ')}_RectifiedVideo.mp4")
 
     return paths, outFile
 
