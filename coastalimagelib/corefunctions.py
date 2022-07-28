@@ -885,4 +885,5 @@ class CameraData(object):
             self.Ud, self.Vd = xyz2DistUV(grid, self)
         elif self.mType == "DLT":
             self.Ud, self.Vd = dlt2UV(grid, self)
-        sys.exit("This intrinsics format is not supported")
+        else:
+            sys.exit("This intrinsics format is not supported")
