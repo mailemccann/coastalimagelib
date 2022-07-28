@@ -506,12 +506,16 @@ def pixelStack(frames, grid, cameras, disp_flag=0):
             image = matchHist(ref, image)
 
         # Find distorted UV points at each XY location in grid
-        if calib.mType == "CIRN":
-            Ud, Vd = xyz2DistUV(grid, calib)
-        elif calib.mType == "DLT":
-            Ud, Vd = dlt2UV(grid, calib)
+        if calib.Uv == "None":
+            if calib.mType == "CIRN":
+                Ud, Vd = xyz2DistUV(grid, calib)
+            elif calib.mType == "DLT":
+                Ud, Vd = dlt2UV(grid, calib)
+            else:
+                sys.exit("This intrinsics format is not supported")
         else:
-            sys.exit("This intrinsics format is not supported")
+            Ud = calib.Ud
+            Vd = calib.Vd
 
         # Grab pixels from image at each position
         ir = getPixels(image, Ud, Vd, s)
@@ -703,6 +707,10 @@ class CameraData(object):
             coordinates
         IC: [4 x 3] Translation matrix to translate XYZ world coordinates to
             camera coordinates
+        Ud: Distorted u pixel coordinates for current XYZ rectification grid.
+            (defaults to "None" until user adds via addUV function)
+        Vd: Distorted v pixel coordinates for current XYZ rectification grid.
+            (defaults to "None" until user adds via addUV function)
 
     """
 
@@ -721,6 +729,8 @@ class CameraData(object):
         self.coords = coords
         self.mType = mType
         self.nc = nc
+        self.Vd = "None"
+        self.Vd = "None"
 
         # If in geo coordinates, convert to local
         self.local_extrinsics = extrinsics
@@ -850,3 +860,29 @@ class CameraData(object):
         self.d3 = self.intrinsics[8]
         self.t1 = self.intrinsics[9]
         self.t2 = self.intrinsics[10]
+
+    def addUV(self, grid):
+        """
+        This function precalculates the distorted UV coordinates (UVd)  that
+        correspond to a set of world xyz points for the camera matrix contained
+        in the self object. 
+
+        This allows the user to save computational time by only having to do 
+        this calculation once for one camera-grid pair.
+
+        Arguments:
+            self: CameraData object containing the DLT coefficient vector A->L
+            grid: XYZGrid object containing real world coords
+
+        Attributes:
+            Ud= Nx1 vector of distorted U coordinates for N points.
+            Vd= Nx1 vector of distorted V coordinates for N points.
+
+        """
+
+        # Find distorted UV points at each XY location in grid
+        if self.mType == "CIRN":
+            self.Ud, self.Vd = xyz2DistUV(grid, self)
+        elif self.mType == "DLT":
+            self.Ud, self.Vd = dlt2UV(grid, self)
+        sys.exit("This intrinsics format is not supported")

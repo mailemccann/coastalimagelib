@@ -1,0 +1,13 @@
+imageio
+matplotlib
+numpy
+opencv-python
+jupyter
+ipykernel
+scikit-image
+scipy
+scikit-image
+scikit-learn
+netCDF4
+multiprocess
+xarray

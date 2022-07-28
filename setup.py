@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="coastalimagelib",
-    version="v1.0.0",
+    version="1.0.0",
     author="Maile P. McCann",
     author_email="mailemcc@usc.ed",
     url="https://github.com/mailemccann/coastalimagelib",
@@ -12,7 +12,7 @@ setup(
     install_requires=['imageio',
                     'matplotlib',
                     'numpy',
-                    'opencv',
+                    'opencv-python',
                     'jupyter',
                     'ipykernel',
                     'scikit-image',

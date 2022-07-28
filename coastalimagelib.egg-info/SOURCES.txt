@@ -1,0 +1,11 @@
+LICENSE
+README.md
+setup.py
+coastalimagelib/argusIO.py
+coastalimagelib/corefunctions.py
+coastalimagelib/supportfunctions.py
+coastalimagelib.egg-info/PKG-INFO
+coastalimagelib.egg-info/SOURCES.txt
+coastalimagelib.egg-info/dependency_links.txt
+coastalimagelib.egg-info/requires.txt
+coastalimagelib.egg-info/top_level.txt
