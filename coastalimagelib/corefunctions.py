@@ -337,14 +337,17 @@ def mergeRectify(input_frames, cameras, grid):
             ref = image
         else:
             image = matchHist(ref, image)
-
-        # Find distorted UV points at each XY location in grid
-        if calib.mType == "CIRN":
-            Ud, Vd = xyz2DistUV(grid, calib)
-        elif calib.mType == "DLT":
-            Ud, Vd = dlt2UV(grid, calib)
+        if calib.Ud == "None":
+            # Find distorted UV points at each XY location in grid
+            if calib.mType == "CIRN":
+                Ud, Vd = xyz2DistUV(grid, calib)
+            elif calib.mType == "DLT":
+                Ud, Vd = dlt2UV(grid, calib)
+            else:
+                sys.exit("This intrinsics format is not supported")
         else:
-            sys.exit("This intrinsics format is not supported")
+            Ud = calib.Ud
+            Vd = calib.Vd
 
         # Grab pixels from image at each position
         ir = getPixels(image, Ud, Vd, s)

@@ -254,14 +254,14 @@ def deBayerArgus(cams, rawPaths, frame=0, numFrames=0):
     Based on argusIO code written by Dylan Anderson.
 
     """
-    import argusIO
+    import argusIO_v2
 
     cameras = dict()
     frames = dict()
 
     for p in range(len(cams)):
         # how many raw frames to skip
-        cameras[cams[p]] = argusIO.cameraIO(
+        cameras[cams[p]] = argusIO_v2.cameraIO(
             cameraID=cams[p],
             rawPath=rawPaths[p],
             startFrame=frame,
@@ -315,7 +315,7 @@ def deBayerParallel(i, cams, rawPaths, frame=0, numFrames=0):
     Based on argusIO code written by Dylan Anderson.
 
     """
-    import argusIO
+    import argusIO_v2
     import multiprocessing as mp
 
     cameras = dict()
