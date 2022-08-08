@@ -2,6 +2,7 @@ LICENSE
 README.md
 setup.py
 coastalimagelib/argusIO.py
+coastalimagelib/argusIO_v2.py
 coastalimagelib/corefunctions.py
 coastalimagelib/supportfunctions.py
 coastalimagelib.egg-info/PKG-INFO
