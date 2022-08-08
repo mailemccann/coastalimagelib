@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="coastalimagelib",
-    version="1.0.0",
+    version="1.1.0",
     author="Maile P. McCann",
     author_email="mailemcc@usc.ed",
     url="https://github.com/mailemccann/coastalimagelib",
