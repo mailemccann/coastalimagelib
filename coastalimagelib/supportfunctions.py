@@ -232,7 +232,7 @@ Argus Functions
 """
 
 
-def deBayerArgus(cams, rawPaths, frame=0, numFrames=0):
+def deBayerArgus(cams, rawPaths, frame=0, numFrames=1):
     """
     Requires argusIO
 
@@ -256,10 +256,11 @@ def deBayerArgus(cams, rawPaths, frame=0, numFrames=0):
 
     """
     import argusIO_v2
-
     cameras = dict()
     frames = dict()
-
+    timeFrames = []
+    frameGain = []
+    frameShutter = []
     for p in range(len(cams)):
         # how many raw frames to skip
         cameras[cams[p]] = argusIO_v2.cameraIO(
@@ -273,6 +274,9 @@ def deBayerArgus(cams, rawPaths, frame=0, numFrames=0):
         del cameras[cams[p]].raw
 
         frames[cams[p]] = cameras[cams[p]].imGrayCV
+        timeFrames.append(cameras[cams[p]].rawTimes)
+        frameGain.append(cameras[cams[p]].rawGain)
+        frameShutter.append(cameras[cams[p]].rawShutter)
 
     if numFrames > 1:
         s = frames[cams[0]][:, :, 0].shape
@@ -290,7 +294,7 @@ def deBayerArgus(cams, rawPaths, frame=0, numFrames=0):
         for p in range(len(cams)):
             outmats[:, :, p] = frames[cams[p]].astype(np.uint8)
 
-    return outmats
+    return outmats, timeFrames, frameGain, frameShutter
 
 
 def deBayerParallel(i, cams, rawPaths, frame=0, numFrames=0):

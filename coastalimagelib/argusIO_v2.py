@@ -35,7 +35,7 @@ class cameraIO():
         with open(self.rawPath, "rb") as my_file:
             self.fh = my_file
             cameraIO.readHeaderLines(self)
-            cameraIO.readAIIIrawFullFrame(self)
+            cameraIO.readAIIIrawFullFrameWithTimeStamp(self)
 
     def readHeaderLines(self):
         '''
@@ -64,8 +64,11 @@ class cameraIO():
         self.header = separated
         self.w = int(separated['cameraWidth'])
         self.h = int(separated['cameraHeight'])
+        self.t = separated['begin']
+        self.gain = separated['cameraGain']
+        self.shutter = separated['cameraShutter']
 
-    def readAIIIrawFullFrame(self):
+    def readAIIIrawFullFrameWithTimeStamp(self):
 
         '''
         This function reads AIII raw files and populates the self.raw object
@@ -79,6 +82,110 @@ class cameraIO():
         '''
 
         skipoffset = self.startFrame*32 + self.startFrame*self.w*self.h
+        self.fh.seek(32, 1)
+        if skipoffset > 0:
+            captureTimes = []
+            captureGain = []
+            captureShutter = []
+            for i in range(self.nFrames):
+
+                if i == 0:
+                    # The first int32 before each frame is a unix time stamp (to the left of the decimal)
+                    timeInt = np.fromfile(file=self.fh, dtype=np.int32, count=1, offset=skipoffset-32)
+                    # The second int32 in each frame is fractions of second (divide by a million)
+                    timeFrac = np.fromfile(file=self.fh, dtype=np.int32, count=1)
+                    shutter = np.fromfile(file=self.fh, dtype=np.double, count=1)
+                    gain = np.fromfile(file=self.fh, dtype=np.double, count=1)
+                    binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h, offset=8)
+                    timeStamp = timeFrac / 1000000 + timeInt
+                else:
+                    # The first int32 before each frame is a unix time stamp (to the left of the decimal)
+                    timeInt = np.fromfile(file=self.fh, dtype=np.int32, count=1)
+                    # The second int32 in each frame is fractions of second (divide by a million)
+                    timeFrac = np.fromfile(file=self.fh, dtype=np.int32, count=1)
+                    shutter = np.fromfile(file=self.fh, dtype=np.double, count=1)
+                    gain = np.fromfile(file=self.fh, dtype=np.double, count=1)
+                    binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h, offset=8)
+                    timeStamp = timeFrac / 1000000 + timeInt
+                data = np.uint8(binary)
+                del binary
+
+                if i == 0:
+                    I = data.reshape((self.h, self.w))
+                    captureTimes.append(timeStamp)
+                    captureGain.append(gain)
+                    captureShutter.append(shutter)
+                else:
+                    I = np.dstack((I, data.reshape((self.h, self.w))))
+                    captureTimes.append(timeStamp)
+                    captureGain.append(gain)
+                    captureShutter.append(shutter)
+                del data
+            self.raw = I
+            self.rawTimes = captureTimes
+            self.rawGain = captureGain
+            self.rawShutter = captureShutter
+
+        else:
+            captureTimes = []
+            captureGain = []
+            captureShutter = []
+            for i in range(self.nFrames):
+                #print('starting at the beginning of the recording')
+                if i == 0:
+                    binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h)
+                    timeStamp = self.t
+                    gain = self.gain
+                    shutter = self.shutter
+                else:
+                    # The first int32 before each frame is a unix time stamp (to the left of the decimal)
+                    timeInt = np.fromfile(file=self.fh, dtype=np.int32, count=1)
+                    # The second int32 in each frame is fractions of second (divide by a million)
+                    timeFrac = np.fromfile(file=self.fh, dtype=np.int32, count=1)
+                    shutter = np.fromfile(file=self.fh, dtype=np.double, count=1)
+                    gain = np.fromfile(file=self.fh, dtype=np.double, count=1)
+                    binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h, offset=8)
+                    timeStamp = timeFrac / 1000000 + timeInt
+
+                data = np.uint8(binary)  # i think this is redundant to above with dtype argument of np.uint8
+                del binary
+                
+                if len(data) == 0:
+                    # here adjust our frame count to what is accurate then break out of the loop
+                    # and continue processing as normal
+                    self.nFrames = i
+                    break
+
+                if i == 0:
+                    I = data.reshape((self.h, self.w))
+                    captureTimes.append(timeStamp)
+                    captureGain.append(gain)
+                    captureShutter.append(shutter)
+                else:
+                    I = np.dstack((I, data.reshape((self.h, self.w))))
+                    captureTimes.append(timeStamp)
+                    captureGain.append(gain)
+                    captureShutter.append(shutter)
+                del data
+            self.raw = I
+            self.rawTimes = captureTimes
+            self.rawGain = captureGain
+            self.rawShutter = captureShutter
+
+    def readAIIIrawFullFrame(self):
+
+        '''
+        This function reads AIII raw files and populates the self.raw object
+        by reading the *.raw file frame by frame and adding each to the multi-
+        dimensional array without cropping the frames
+
+        Attributes:
+            self.raw: (ndarray) contains all raw sensor data from one camera,
+                read from self.rawPath
+
+        '''
+
+        skipoffset = self.startFrame * 32 + self.startFrame * self.w * self.h
         self.fh.seek(30, 1)
         if skipoffset > 0:
             for i in range(self.nFrames):
@@ -102,6 +209,7 @@ class cameraIO():
         else:
 
             for i in range(self.nFrames):
+                print(skipoffset)
                 if i == 0:
                     binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h)
                 else:
@@ -109,7 +217,7 @@ class cameraIO():
 
                 data = np.uint8(binary)  # i think this is redundant to above with dtype argument of np.uint8
                 del binary
-                
+
                 if len(data) == 0:
                     # here adjust our frame count to what is accurate then break out of the loop
                     # and continue processing as normal
