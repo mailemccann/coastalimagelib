@@ -73,13 +73,24 @@ class cameraIO():
         '''
         This function reads AIII raw files and populates the self.raw object
         by reading the *.raw file frame by frame and adding each to the multi-
-        dimensional array without cropping the frames
+        dimensional array without cropping the frames. The function enters
+        either side of the if/else statement depending on whether it is begin-
+        ning a the start of the file or reaching into the middle of the binary
+        file to grab a snap.
 
         Attributes:
             self.raw: (ndarray) contains all raw sensor data from one camera,
                 read from self.rawPath
+            self.rawTimes (list) contains unix timestamps for each raw read
+            self.rawGain (list) contains camera gain for each snap
+            self.rawShutter (list) contains shutter speed for each snap
         
         '''
+
+        ### TODO: the ability to seek a specific 'time' rather than 'frame number'
+        ### TODO: check shutter and gain image header units
+        ### TODO: determine mystery 8 bytes between image header and snap
+
 
         skipoffset = self.startFrame*32 + self.startFrame*self.w*self.h
         self.fh.seek(32, 1)
@@ -135,6 +146,8 @@ class cameraIO():
                 if i == 0:
                     binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h)
                     timeStamp = self.t
+                    # grabbing the gain and shutter from the file header, but this appears to be a different unit
+                    # from the gain and shutter values returns from each of the other image headers in the file...
                     gain = self.gain
                     shutter = self.shutter
                 else:
