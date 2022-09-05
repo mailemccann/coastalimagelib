@@ -163,8 +163,12 @@ class cameraIO():
             timeStamp = timeFrac / 1000000 + timeInt
 
             data = np.uint8(binary)
-            del binary
 
+            # If the current frame has no pixels, set all to 0
+            if np.size(data) == 0:
+                data = np.zeros((self.h, self.w))
+
+            del binary
             if i == 0:
                 I = data.reshape((self.h, self.w))
                 captureTimes.append(timeStamp)
@@ -299,6 +303,8 @@ class cameraIO():
                     binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h, offset=32)
 
                 data = np.uint8(binary)
+                if np.size(data) ==0:
+                    data = np.zeros((self.h, self.w))
                 del binary
 
                 if i == 0:
@@ -319,6 +325,8 @@ class cameraIO():
                     binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h, offset=32)
 
                 data = np.uint8(binary)  # i think this is redundant to above with dtype argument of np.uint8
+                if np.size(data) ==0:
+                    data = np.zeros((self.h, self.w))
                 del binary
 
                 if len(data) == 0:
