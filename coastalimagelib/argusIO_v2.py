@@ -37,13 +37,25 @@ class cameraIO():
             cameraIO.readHeaderLines(self)
             cameraIO.readAIIIrawFullFrameWithTimeStamp(self)
 
+    def readRawImageHeaders(self):
+        '''
+        This function is utilized for opening *.raw Argus files prior to a debayering task,
+        and adds the
+
+        Must call this function before calling any debayering functions
+        '''
+        with open(self.rawPath, "rb") as my_file:
+            self.fh = my_file
+            cameraIO.readHeaderLines(self)
+            # cameraIO.readAIIIrawFullFrameWithTimeStamp(self)
+            cameraIO.readAIIIrawImageHeaders(self)
+
     def readHeaderLines(self):
         '''
         Reads the header lines of a .raw file to obtain metadata to
         feed into deBayering function
 
         '''
-
         separated = dict()
         lines = dict()
         for i in range(25):
@@ -68,6 +80,49 @@ class cameraIO():
         self.gain = separated['cameraGain']
         self.shutter = separated['cameraShutter']
 
+    def readAIIIrawImageHeaders(self):
+
+        '''
+        This function reads AIII image headers from a .raw file
+
+        Attributes:
+            self.ihTimes (list) contains unix timestamps for each raw read
+            self.ihGain (list) contains camera gain for each snap
+            self.ihShutter (list) contains shutter speed for each snap
+
+        '''
+
+        ### TODO: check shutter and gain image header units
+
+        skipoffset = self.startFrame * 32 + self.startFrame * self.w * self.h
+        self.fh.seek(32, 1)
+        captureTimes = []
+        captureGain = []
+        captureShutter = []
+        for i in range(self.nFrames):
+            # The first int32 before each frame is a unix time stamp (to the left of the decimal)
+            timeInt = np.fromfile(file=self.fh, dtype=np.int32, count=1, offset=skipoffset - 32)
+            # The second int32 in each frame is fractions of second (divide by a million)
+            timeFrac = np.fromfile(file=self.fh, dtype=np.int32, count=1)
+            shutter = np.fromfile(file=self.fh, dtype=np.double, count=1)
+            gain = np.fromfile(file=self.fh, dtype=np.double, count=1)
+            timeStamp = timeFrac / 1000000 + timeInt
+            skipoffset = self.startFrame * 32 + self.startFrame * self.w * self.h + self.w * self.h + 32
+            if i == 0:
+                captureTimes.append(timeStamp)
+                captureGain.append(gain)
+                captureShutter.append(shutter)
+            else:
+                captureTimes.append(timeStamp)
+                captureGain.append(gain)
+                captureShutter.append(shutter)
+        self.ihTimes = captureTimes
+        self.ihGain = captureGain
+        self.ihShutter = captureShutter
+
+
+
+
     def readAIIIrawFullFrameWithTimeStamp(self):
 
         '''
@@ -91,99 +146,134 @@ class cameraIO():
         ### TODO: check shutter and gain image header units
         ### TODO: determine mystery 8 bytes between image header and snap
 
-
-        skipoffset = self.startFrame*32 + self.startFrame*self.w*self.h
+        skipoffset = self.startFrame * 32 + self.startFrame * self.w * self.h
         self.fh.seek(32, 1)
-        if skipoffset > 0:
-            captureTimes = []
-            captureGain = []
-            captureShutter = []
-            for i in range(self.nFrames):
+        captureTimes = []
+        captureGain = []
+        captureShutter = []
+        for i in range(self.nFrames):
 
-                if i == 0:
-                    # The first int32 before each frame is a unix time stamp (to the left of the decimal)
-                    timeInt = np.fromfile(file=self.fh, dtype=np.int32, count=1, offset=skipoffset-32)
-                    # The second int32 in each frame is fractions of second (divide by a million)
-                    timeFrac = np.fromfile(file=self.fh, dtype=np.int32, count=1)
-                    shutter = np.fromfile(file=self.fh, dtype=np.double, count=1)
-                    gain = np.fromfile(file=self.fh, dtype=np.double, count=1)
-                    binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h, offset=8)
-                    timeStamp = timeFrac / 1000000 + timeInt
-                else:
-                    # The first int32 before each frame is a unix time stamp (to the left of the decimal)
-                    timeInt = np.fromfile(file=self.fh, dtype=np.int32, count=1)
-                    # The second int32 in each frame is fractions of second (divide by a million)
-                    timeFrac = np.fromfile(file=self.fh, dtype=np.int32, count=1)
-                    shutter = np.fromfile(file=self.fh, dtype=np.double, count=1)
-                    gain = np.fromfile(file=self.fh, dtype=np.double, count=1)
-                    binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h, offset=8)
-                    timeStamp = timeFrac / 1000000 + timeInt
-                data = np.uint8(binary)
-                del binary
+            # The first int32 before each frame is a unix time stamp (to the left of the decimal)
+            timeInt = np.fromfile(file=self.fh, dtype=np.int32, count=1, offset=skipoffset - 32)
+            # The second int32 in each frame is fractions of second (divide by a million)
+            timeFrac = np.fromfile(file=self.fh, dtype=np.int32, count=1)
+            shutter = np.fromfile(file=self.fh, dtype=np.double, count=1)
+            gain = np.fromfile(file=self.fh, dtype=np.double, count=1)
+            binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h, offset=8)
+            timeStamp = timeFrac / 1000000 + timeInt
 
-                if i == 0:
-                    I = data.reshape((self.h, self.w))
-                    captureTimes.append(timeStamp)
-                    captureGain.append(gain)
-                    captureShutter.append(shutter)
-                else:
-                    I = np.dstack((I, data.reshape((self.h, self.w))))
-                    captureTimes.append(timeStamp)
-                    captureGain.append(gain)
-                    captureShutter.append(shutter)
-                del data
-            self.raw = I
-            self.rawTimes = captureTimes
-            self.rawGain = captureGain
-            self.rawShutter = captureShutter
+            data = np.uint8(binary)
+            del binary
 
-        else:
-            captureTimes = []
-            captureGain = []
-            captureShutter = []
-            for i in range(self.nFrames):
-                #print('starting at the beginning of the recording')
-                if i == 0:
-                    binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h)
-                    timeStamp = self.t
-                    # grabbing the gain and shutter from the file header, but this appears to be a different unit
-                    # from the gain and shutter values returns from each of the other image headers in the file...
-                    gain = self.gain
-                    shutter = self.shutter
-                else:
-                    # The first int32 before each frame is a unix time stamp (to the left of the decimal)
-                    timeInt = np.fromfile(file=self.fh, dtype=np.int32, count=1)
-                    # The second int32 in each frame is fractions of second (divide by a million)
-                    timeFrac = np.fromfile(file=self.fh, dtype=np.int32, count=1)
-                    shutter = np.fromfile(file=self.fh, dtype=np.double, count=1)
-                    gain = np.fromfile(file=self.fh, dtype=np.double, count=1)
-                    binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h, offset=8)
-                    timeStamp = timeFrac / 1000000 + timeInt
+            if i == 0:
+                I = data.reshape((self.h, self.w))
+                captureTimes.append(timeStamp)
+                captureGain.append(gain)
+                captureShutter.append(shutter)
+            else:
+                I = np.dstack((I, data.reshape((self.h, self.w))))
+                captureTimes.append(timeStamp)
+                captureGain.append(gain)
+                captureShutter.append(shutter)
+            del data
+        self.raw = I
+        self.rawTimes = captureTimes
+        self.rawGain = captureGain
+        self.rawShutter = captureShutter
 
-                data = np.uint8(binary)  # i think this is redundant to above with dtype argument of np.uint8
-                del binary
-                
-                if len(data) == 0:
-                    # here adjust our frame count to what is accurate then break out of the loop
-                    # and continue processing as normal
-                    self.nFrames = i
-                    break
-
-                if i == 0:
-                    I = data.reshape((self.h, self.w))
-                    captureTimes.append(timeStamp)
-                    captureGain.append(gain)
-                    captureShutter.append(shutter)
-                else:
-                    I = np.dstack((I, data.reshape((self.h, self.w))))
-                    captureTimes.append(timeStamp)
-                    captureGain.append(gain)
-                    captureShutter.append(shutter)
-                del data
-            self.raw = I
-            self.rawTimes = captureTimes
-            self.rawGain = captureGain
-            self.rawShutter = captureShutter
+        #
+        # skipoffset = self.startFrame*32 + self.startFrame*self.w*self.h
+        # self.fh.seek(32, 1)
+        # if skipoffset > 0:
+        #     captureTimes = []
+        #     captureGain = []
+        #     captureShutter = []
+        #     for i in range(self.nFrames):
+        #
+        #         if i == 0:
+        #             # The first int32 before each frame is a unix time stamp (to the left of the decimal)
+        #             timeInt = np.fromfile(file=self.fh, dtype=np.int32, count=1, offset=skipoffset-32)
+        #             # The second int32 in each frame is fractions of second (divide by a million)
+        #             timeFrac = np.fromfile(file=self.fh, dtype=np.int32, count=1)
+        #             shutter = np.fromfile(file=self.fh, dtype=np.double, count=1)
+        #             gain = np.fromfile(file=self.fh, dtype=np.double, count=1)
+        #             binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h, offset=8)
+        #             timeStamp = timeFrac / 1000000 + timeInt
+        #         else:
+        #             # The first int32 before each frame is a unix time stamp (to the left of the decimal)
+        #             timeInt = np.fromfile(file=self.fh, dtype=np.int32, count=1)
+        #             # The second int32 in each frame is fractions of second (divide by a million)
+        #             timeFrac = np.fromfile(file=self.fh, dtype=np.int32, count=1)
+        #             shutter = np.fromfile(file=self.fh, dtype=np.double, count=1)
+        #             gain = np.fromfile(file=self.fh, dtype=np.double, count=1)
+        #             binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h, offset=8)
+        #             timeStamp = timeFrac / 1000000 + timeInt
+        #         data = np.uint8(binary)
+        #         del binary
+        #
+        #         if i == 0:
+        #             I = data.reshape((self.h, self.w))
+        #             captureTimes.append(timeStamp)
+        #             captureGain.append(gain)
+        #             captureShutter.append(shutter)
+        #         else:
+        #             I = np.dstack((I, data.reshape((self.h, self.w))))
+        #             captureTimes.append(timeStamp)
+        #             captureGain.append(gain)
+        #             captureShutter.append(shutter)
+        #         del data
+        #     self.raw = I
+        #     self.rawTimes = captureTimes
+        #     self.rawGain = captureGain
+        #     self.rawShutter = captureShutter
+        #
+        # else:
+        #     captureTimes = []
+        #     captureGain = []
+        #     captureShutter = []
+        #     for i in range(self.nFrames):
+        #         #print('starting at the beginning of the recording')
+        #         if i == 0:
+        #             binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h)
+        #             timeStamp = self.t
+        #             # grabbing the gain and shutter from the file header, but this appears to be a different unit
+        #             # from the gain and shutter values returns from each of the other image headers in the file...
+        #             gain = self.gain
+        #             shutter = self.shutter
+        #         else:
+        #             # The first int32 before each frame is a unix time stamp (to the left of the decimal)
+        #             timeInt = np.fromfile(file=self.fh, dtype=np.int32, count=1)
+        #             # The second int32 in each frame is fractions of second (divide by a million)
+        #             timeFrac = np.fromfile(file=self.fh, dtype=np.int32, count=1)
+        #             shutter = np.fromfile(file=self.fh, dtype=np.double, count=1)
+        #             gain = np.fromfile(file=self.fh, dtype=np.double, count=1)
+        #             binary = np.fromfile(file=self.fh, dtype=np.uint8, count=self.w * self.h, offset=8)
+        #             timeStamp = timeFrac / 1000000 + timeInt
+        #
+        #         data = np.uint8(binary)  # i think this is redundant to above with dtype argument of np.uint8
+        #         del binary
+        #
+        #         if len(data) == 0:
+        #             # here adjust our frame count to what is accurate then break out of the loop
+        #             # and continue processing as normal
+        #             self.nFrames = i
+        #             break
+        #
+        #         if i == 0:
+        #             I = data.reshape((self.h, self.w))
+        #             captureTimes.append(timeStamp)
+        #             captureGain.append(gain)
+        #             captureShutter.append(shutter)
+        #         else:
+        #             I = np.dstack((I, data.reshape((self.h, self.w))))
+        #             captureTimes.append(timeStamp)
+        #             captureGain.append(gain)
+        #             captureShutter.append(shutter)
+        #         del data
+        #     self.raw = I
+        #     self.rawTimes = captureTimes
+        #     self.rawGain = captureGain
+        #     self.rawShutter = captureShutter
 
     def readAIIIrawFullFrame(self):
 

@@ -288,7 +288,7 @@ def cameraSeamBlend(IrIndv, numcams, nc):
     return M.astype(np.uint8)
 
 
-def mergeRectify(input_frames, cameras, grid):
+def mergeRectify(input_frames, cameras, grid, **kwargs):
     """
     This function performs image rectifications at one timestamp given
     the associated extrinsics, intrinsics, and distorted images
@@ -321,7 +321,7 @@ def mergeRectify(input_frames, cameras, grid):
     """
     s = grid.X.shape
     numcams = len(cameras)
-
+    refImage = kwargs.get('refImage', None)
     # Iterate through each camera from to produce single merged frame
     for k, (I, calib) in enumerate(zip(input_frames, cameras)):
         nc = calib.nc
@@ -332,11 +332,38 @@ def mergeRectify(input_frames, cameras, grid):
         else:
             image = input_frames[:, :, (k * nc): (k * nc + nc)]
 
+        ### TODO: store a reference histogram as a self object that we repeatedly come to
         # Match histograms
-        if k == 0:
-            ref = image
+        if refImage is None:
+            refImage = input_frames[:, :, (k + 2 * nc): (k + 2 * nc + nc)]
+            print('made a reference image')
+        if np.max(image) == 0:
+            image = image
+            print('found an image with max = 0')
         else:
-            image = matchHist(ref, image)
+            image = matchHist(refImage, image)
+
+        # if k == 0:
+        #     if np.max(image) == 0:
+        #         ref = input_frames[:, :, (k+1 * nc): (k+1 * nc + nc)]
+        #         if np.max(ref) == 0:
+        #             ref = input_frames[:, :, (k+2 * nc): (k+2 * nc + nc)]
+        #             if np.max(ref) == 0:
+        #                 ref = input_frames[:, :, (k + 3 * nc): (k + 3 * nc + nc)]
+        #                 if np.max(ref) == 0:
+        #                     ref = input_frames[:, :, (k + 4 * nc): (k + 4 * nc + nc)]
+        #                     if np.max(ref) == 0:
+        #                         ref = input_frames[:, :, (k + 5 * nc): (k + 5 * nc + nc)]
+        #     else:
+        #         ref = image
+        # else:
+        #     if np.max(image) == 0:
+        #         image = image
+        #         print('found an image with max = 0')
+        #     else:
+        #         image = matchHist(ref, image)
+
+
         if calib.Ud == "None":
             # Find distorted UV points at each XY location in grid
             if calib.mType == "CIRN":
@@ -362,7 +389,7 @@ def mergeRectify(input_frames, cameras, grid):
     Ir = cameraSeamBlend(IrIndv, numcams, nc)
 
     # Return merged frame
-    return np.flipud(Ir.astype(np.uint8))
+    return np.flipud(Ir.astype(np.uint8)), refImage
 
 
 def rectVideos(video_list, cameras, grid, numFrames):

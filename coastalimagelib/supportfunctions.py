@@ -232,7 +232,7 @@ Argus Functions
 """
 
 
-def deBayerArgus(cams, rawPaths, frame=0, numFrames=1):
+def deBayerArgus(cams, rawPaths, frame=0, numFrames=1, checkHeaders=False):
     """
     Requires argusIO
 
@@ -255,46 +255,82 @@ def deBayerArgus(cams, rawPaths, frame=0, numFrames=1):
     Based on argusIO code written by Dylan Anderson.
 
     """
-    import argusIO_v2
-    cameras = dict()
-    frames = dict()
-    timeFrames = []
-    frameGain = []
-    frameShutter = []
-    for p in range(len(cams)):
-        # how many raw frames to skip
-        cameras[cams[p]] = argusIO_v2.cameraIO(
-            cameraID=cams[p],
-            rawPath=rawPaths[p],
-            startFrame=frame,
-            nFrames=numFrames
-        )
-        cameras[cams[p]].readRaw()
-        cameras[cams[p]].deBayer()
-        del cameras[cams[p]].raw
-
-        frames[cams[p]] = cameras[cams[p]].imGrayCV
-        timeFrames.append(cameras[cams[p]].rawTimes)
-        frameGain.append(cameras[cams[p]].rawGain)
-        frameShutter.append(cameras[cams[p]].rawShutter)
-
-    if numFrames > 1:
-        s = frames[cams[0]][:, :, 0].shape
-        outmats = np.zeros(
-            (s[0], s[1], len(cams), cameras["c1"].nFrames), dtype=np.uint8
-        )
-
-        for f in range(cameras["c1"].nFrames):
-            for p in range(len(cams)):
-                outmats[:, :, p, f] = frames[cams[p]][:, :, f].astype(np.uint8)
-    else:
-        s = frames[cams[0]].shape
-        outmats = np.zeros((s[0], s[1], len(cams)), dtype=np.uint8)
-
+    if checkHeaders == True:
+        import argusIO_v2
+        cameras = dict()
+        timeFrames = []
+        frameGain = []
+        frameShutter = []
         for p in range(len(cams)):
-            outmats[:, :, p] = frames[cams[p]].astype(np.uint8)
+            # how many raw frames to skip
+            cameras[cams[p]] = argusIO_v2.cameraIO(
+                cameraID=cams[p],
+                rawPath=rawPaths[p],
+                startFrame=frame,
+                nFrames=numFrames
+            )
+            cameras[cams[p]].readRawImageHeaders()
 
-    return outmats, timeFrames, frameGain, frameShutter
+            timeFrames.append(cameras[cams[p]].ihTimes)
+            frameGain.append(cameras[cams[p]].ihGain)
+            frameShutter.append(cameras[cams[p]].ihShutter)
+        return timeFrames, frameGain, frameShutter
+
+
+
+    else:
+        import argusIO_v2
+        cameras = dict()
+        frames = dict()
+        timeFrames = []
+        frameGain = []
+        frameShutter = []
+        for p in range(len(cams)):
+            # do we have a photo here?
+            if len(frame[p]) > 0:
+                # how many raw frames to skip
+                cameras[cams[p]] = argusIO_v2.cameraIO(
+                    cameraID=cams[p],
+                    rawPath=rawPaths[p],
+                    startFrame=frame[p][0],
+                    nFrames=numFrames
+                )
+                cameras[cams[p]].readRaw()
+                cameras[cams[p]].deBayer()
+                del cameras[cams[p]].raw
+
+                frames[cams[p]] = cameras[cams[p]].imGrayCV
+                timeFrames.append(cameras[cams[p]].rawTimes)
+                frameGain.append(cameras[cams[p]].rawGain)
+                frameShutter.append(cameras[cams[p]].rawShutter)
+            else:
+                # frames[cams[p]] = np.zeros((cameras[cams[p]].h, cameras[cams[p]].w))
+                frames[cams[p]] = np.zeros((2048, 2448))
+
+        ### TODO: remove hardcoding of camera shape dependence on "cams[0]" and/or dependence on 2048/2448
+        if numFrames > 1:
+            #s = frames[cams[0]][:, :, 0].shape
+            # outmats = np.zeros(
+            #     (s[0], s[1], len(cams), cameras["c1"].nFrames), dtype=np.uint8
+            # )
+            outmats = np.zeros(
+                (2048, 2448, len(cams), cameras["c1"].nFrames), dtype=np.uint8
+            )
+            ### TODO: remove hardcoding dependence on "c1"
+            # for f in range(cameras["c1"].nFrames):
+            for f in range(numFrames):
+                for p in range(len(cams)):
+                    outmats[:, :, p, f] = frames[cams[p]][:, :, f].astype(np.uint8)
+        else:
+            # s = frames[cams[0]].shape
+            # outmats = np.zeros((s[0], s[1], len(cams)), dtype=np.uint8)
+            outmats = np.zeros((2048, 2448, 6), dtype=np.uint8)
+            for p in range(len(cams)):
+                if len(frame[p]) > 0:
+                    print('adding a real image')
+                    outmats[:, :, p] = frames[cams[p]].astype(np.uint8)
+
+        return outmats, timeFrames, frameGain, frameShutter
 
 
 def deBayerParallel(i, cams, rawPaths, frame=0, numFrames=0):
