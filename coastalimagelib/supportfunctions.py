@@ -287,12 +287,13 @@ def deBayerArgus(cams, rawPaths, frame=0, numFrames=1, checkHeaders=False):
         frameShutter = []
         for p in range(len(cams)):
             # do we have a photo here?
-            if len(frame[p]) > 0:
+            #if len(frame[p]) > 0:
+            if frame[p] > 0:
                 # how many raw frames to skip
                 cameras[cams[p]] = argusIO_v2.cameraIO(
                     cameraID=cams[p],
                     rawPath=rawPaths[p],
-                    startFrame=frame[p][0],
+                    startFrame=frame[p],
                     nFrames=numFrames
                 )
                 cameras[cams[p]].readRaw()
@@ -326,7 +327,7 @@ def deBayerArgus(cams, rawPaths, frame=0, numFrames=1, checkHeaders=False):
             # outmats = np.zeros((s[0], s[1], len(cams)), dtype=np.uint8)
             outmats = np.zeros((2048, 2448, 6), dtype=np.uint8)
             for p in range(len(cams)):
-                if len(frame[p]) > 0:
+                if frame[p] > 0:
                     print('adding a real image')
                     outmats[:, :, p] = frames[cams[p]].astype(np.uint8)
 
