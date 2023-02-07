@@ -732,7 +732,7 @@ class CameraData(object):
         self.coords = coords
         self.mType = mType
         self.nc = nc
-        self.Vd = "None"
+        self.Ud = "None"
         self.Vd = "None"
 
         # If in geo coordinates, convert to local
