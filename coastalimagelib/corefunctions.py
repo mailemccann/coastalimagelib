@@ -365,7 +365,7 @@ def mergeRectify(input_frames, cameras, grid):
     return np.flipud(Ir.astype(np.uint8))
 
 
-def rectVideos(video_list, cameras, grid, numFrames):
+def rectVideos(video_list, cameras, grid, numFrames, savefps = 'None'):
 
     """
     This function performs image rectifications on video files,
@@ -379,6 +379,8 @@ def rectVideos(video_list, cameras, grid, numFrames):
             mType: intrinsic format ('DLT' or 'CIRN')
         xyz (ndarray): XYZ rectification grid
         numFrames (int): number of frames to rectify
+        savefps = frames per second to save video at, default is 'None'
+            If 'None is specified, video will be saved at the same fps as the first input video
 
     Returns:
         rect_array: h x w x numFrames array of rectified frames
@@ -401,15 +403,14 @@ def rectVideos(video_list, cameras, grid, numFrames):
             # Add each frame into one object
             if ind == 0:
                 all_frames = frame
-                if i == 0:
-                    fps = int(cap.get(cv.CAP_PROP_FRAME_COUNT))
+                # Save fps at 
+                if savefps == 'None':
+                    savefps = int(cap.get(cv.CAP_PROP_FRAME_COUNT))
             else:
                 all_frames = np.append(all_frames, frame, axis=2)
 
         # All frames from one timestamp sent to mergeRectify
         merged = mergeRectify(all_frames, cameras, grid)
-        cv.imshow("test", merged)
-        cv.waitKey(0)
 
         if i == 0:
             # Create videowriter object to save video to drive
@@ -421,7 +422,7 @@ def rectVideos(video_list, cameras, grid, numFrames):
             result = cv.VideoWriter(
                 outFile,
                 cv.VideoWriter_fourcc("M", "J", "P", "G"),
-                fps,
+                savefps,
                 (merged.shape[1], merged.shape[0]),
                 1,
             )
@@ -509,7 +510,7 @@ def pixelStack(frames, grid, cameras, disp_flag=0):
             image = matchHist(ref, image)
 
         # Find distorted UV points at each XY location in grid
-        if calib.Uv == "None":
+        if calib.Ud == "None":
             if calib.mType == "CIRN":
                 Ud, Vd = xyz2DistUV(grid, calib)
             elif calib.mType == "DLT":
