@@ -1,8 +1,5 @@
 import numpy as np
 import cv2 as cv
-import os
-import datetime as dt
-import pytz
 
 """
 Supporting Functions:
@@ -24,21 +21,6 @@ Supporting Functions:
         - If you are using coordinates in DLT / Walton- m vector format,
             you must tag the rectifier using mType = 'DLT'
 
-    deBayerArgus(cams,rawPaths,startFrame = 0,savePaths='None')
-        - Requires argusIO (import argusIO)
-        - This function converts frames at one timestamp for multiple cameras
-            stored in .raw files to matrices formatted for use in this toolbox
-        - savePaths = '' allows the user to save each debayered frame to their
-            drive as .png, .jpg, etc. Save paths must include the full filename
-            and file extension
-
-    formatArgusFile(cams,folder,epoch):
-        -Generates filenames in Argus convention based on the epoch
-            time at the start of collection and provided camera tags.
-        -Also generates the name of the merged file of all cameras
-            to save after rectification (although this function doesn't
-            need to be used solely prior to a rectification task).
-
     initFullFileName(infile,label,type='avi',return_all=False):
         -Function for creating an outfile name consistent with any
             naming convention, infile name defines the naming style
@@ -47,8 +29,18 @@ Supporting Functions:
         -Saves the object rect_arr as a netcdf on the user's drive
         -rect_arr can be a rectified image, struct of images,
             pixel instruments, etc
+    
+    estSharpness
+
+    avgColor
+
+    ******convert to rgb from grayscale
+
+    *******convert to hsv from rgb
 
 """
+
+
 
 """
 Transform Functions
@@ -224,246 +216,6 @@ def loadJson(jsonfile):
     with open(jsonfile, "r") as data:
         dictname = json.loads(data.read())
     return dictname
-
-
-"""
-Argus Functions
-
-"""
-
-
-def deBayerArgus(cams, rawPaths, frame=0, numFrames=0):
-    """
-    Requires argusIO
-
-    This function converts frames at one timestamp for multiple cameras
-    stored in .raw files to matrices formatted for use in this toolbox
-
-    Args:
-        rawPaths (list of strings): paths from which to load .raw files
-        frame (int): start frame in .raw file to deBayer
-        savePaths (list of strings): optional, paths to save each debayered
-            frame to drive as .png, .jpg, etc if desired
-            Save paths must include the full filename and file extension
-        numFrames: number of frames to deBayer from start frame ("frame"),
-            (optional- leave out if only debayering one frame)
-
-    Returns:
-        outmat (ndarray): NxMxK matrix of deBayered images, NxM is height
-            and width of frame, K is number of cameras
-
-    Based on argusIO code written by Dylan Anderson.
-
-    """
-    import argusIO_v2
-
-    cameras = dict()
-    frames = dict()
-
-    for p in range(len(cams)):
-        # how many raw frames to skip
-        cameras[cams[p]] = argusIO_v2.cameraIO(
-            cameraID=cams[p],
-            rawPath=rawPaths[p],
-            startFrame=frame,
-            nFrames=numFrames
-        )
-        cameras[cams[p]].readRaw()
-        cameras[cams[p]].deBayer()
-        del cameras[cams[p]].raw
-
-        frames[cams[p]] = cameras[cams[p]].imGrayCV
-
-    if numFrames > 1:
-        s = frames[cams[0]][:, :, 0].shape
-        outmats = np.zeros(
-            (s[0], s[1], len(cams), cameras["c1"].nFrames), dtype=np.uint8
-        )
-
-        for f in range(cameras["c1"].nFrames):
-            for p in range(len(cams)):
-                outmats[:, :, p, f] = frames[cams[p]][:, :, f].astype(np.uint8)
-    else:
-        s = frames[cams[0]].shape
-        outmats = np.zeros((s[0], s[1], len(cams)), dtype=np.uint8)
-
-        for p in range(len(cams)):
-            outmats[:, :, p] = frames[cams[p]].astype(np.uint8)
-
-    return outmats
-
-
-def deBayerParallel(i, cams, rawPaths, frame=0, numFrames=0):
-    """
-    Requires argusIO
-
-    This function converts frames at one timestamp for multiple cameras
-    stored in .raw files to matrices formatted for use in this toolbox
-
-    Args:
-        rawPaths (list of strings): paths from which to load .raw files
-        frame (int): start frame in .raw file to deBayer
-        savePaths (list of strings): optional, paths to save each debayered
-            frame to drive as .png, .jpg, etc if desired
-            Save paths must include the full filename and file extension
-        numFrames: number of frames to deBayer from start frame ("frame"),
-            (optional- leave out if only debayering one frame)
-
-    Returns:
-        outmat (ndarray): NxMxK matrix of deBayered images, NxM is height
-            and width of frame, K is number of cameras
-
-    Based on argusIO code written by Dylan Anderson.
-
-    """
-    import argusIO_v2
-    import multiprocessing as mp
-
-    cameras = dict()
-    frames = dict()
-
-    pool = mp.Pool(mp.cpu_count())
-    results = []
-
-    for p in range(len(cams)):
-        # how many raw frames to skip
-        cameras[cams[p]] = argusIO.cameraIO(
-            cameraID=cams[p],
-            rawPath=rawPaths[p],
-            startFrame=frame,
-            nFrames=numFrames
-        )
-        pool.apply_async(cameras[cams[p]].readRaw())
-
-    pool.close()
-    pool.join()
-
-    for p in range(len(cams)):
-        cameras[cams[p]].deBayer()
-        del cameras[cams[p]].raw
-        frames[cams[p]] = cameras[cams[p]].imGrayCV
-
-    s = frames[cams[0]][:, :, 0].shape
-    outmats = np.zeros((s[0], s[1], len(cams), numFrames))
-
-    for p in range(len(cams)):
-        outmats[:, :, p, :] = frames[cams[p]][:, :, :].astype(np.uint8)
-
-    return outmats
-
-def formatArgusFile(cams, folder, epoch, **kwargs):
-    '''
-    Generates filenames in Argus convention based on the epoch
-    time at the start of collection and provided camera tags.
-    Also generates the name of the merged file of all cameras
-    to save after rectification (although this function doesn't
-    need to be used solely prior to a rectification task).
-
-    Args:
-        cams (list of strings): camera tag for each camera
-        epoch (int): epoch/ UTC time at start of collection, MUST be an integer
-        folder (string): folder where files are/ will be located.
-    Keywork Argument:
-        'outFileBase'(str): this defines the output file name base (default is input file name w/o camera info)
-        - overwrites the automatic argus file naming convention
-        - add full file name and file extension
-    Returns:
-        paths (list of strings): string of fullfile names in Argus convention for each camera
-        outFile (string): out filename of the merged file of all cameras; used if going
-            into a rectification task
-
-    Note: day_folder (eg: '304_Oct.31/') should not be included in the "folder" string,
-        as it changes depending on the epoch time.
-        The day_folder will be generated in this function.
-        
-    '''
-    import netCDF4 as nc
-    t = nc.num2date(epoch, 'seconds since 1970-01-01', only_use_python_datetimes=True, only_use_cftime_datetimes=False)
-    # t = dt.datetime.fromtimestamp(int(epoch))   # this is local time
-    year_start = dt.datetime(t.year, 1, 1, tzinfo=pytz.timezone('America/New_York') )
-
-    jul_str = str(t.timetuple().tm_yday).zfill(3)  # str((t-year_start).days + 1).zfill(3)
-    day_str = t.strftime('%a')
-    mon_str = t.strftime('%b')
-
-    day_folder = jul_str + '_' + mon_str + '.' + str(t.day).zfill(2) + '/'
-    file = f"{epoch}.{t.strftime('%a')}.{t.strftime('%b')}." \
-           f"{t.strftime('%d_%H_%M_%S')}.GMT" \
-           f".{t.strftime('%Y')}.argus02b."
-    paths = [(folder + cams[i] + '/' + day_folder + file + cams[i] + '.raw') for i in range(len(cams))]
-
-    outFile = os.path.join(kwargs.get('outFileBase', folder),
-                    f"ArgusFF_{t.strftime('%Y%m%dT%H%M%SZ')}_RectifiedVideo.mp4")
-
-    return paths, outFile
-
-
-def getThreddsTideTp(t):
-    """
-    Get peak period and water level from the FRF thredds server
-
-    Tries EOP first for water level, if doesn't work, uses 8m array
-
-    Args:
-        t: time in epoch (int)
-
-    Returns:
-        Tp: Peak period (float)
-        WL: water level (float)
-    """
-    import datetime as dt
-    from netCDF4 import Dataset
-
-    time_obj = dt.datetime.utcfromtimestamp(int(t))
-    hr = time_obj.hour
-    yr = time_obj.year
-    mon_str = str(str(time_obj.month).zfill(2))
-
-    frf_base = "https://chlthredds.erdc.dren.mil/thredds/dodsC/frf/"
-    # Peak period Dataset
-    ds = Dataset(frf_base
-                 + "oceanography/waves/8m-array/"
-                 + str(yr)
-                 + "/FRF-ocean_waves_8m-array_"
-                 + str(yr)
-                 + mon_str
-                 + ".nc",
-                 "r",
-    )
-    wave_Tp = ds.variables["waveTp"][:]
-    thredds_time_Tp = np.asarray(ds.variables["time"][:])
-
-    # Water Level Dataset
-    try:
-        # Try EOP
-        ds2 = Dataset(frf_base
-                      + "oceanography/waterlevel/eopNoaaTide/"
-                      + str(yr)
-                      + "/FRF-ocean_waterlevel_eopNoaaTide_"
-                      + str(yr)
-                      + mon_str
-                      + ".nc",
-                      "r",
-        )
-        waterlevel = ds2.variables["waterLevel"][:]
-        thredds_time_WL = np.asarray(ds2.variables["time"][:])
-        print("Water level sourced from EOP")
-    except:
-        # If no EOP, grab from 8m array
-        waterlevel = ds.variables["waterLevel"][:]
-        thredds_time_WL = np.asarray(ds.variables["time"][:])
-        print("Water level sourced from 8m array")
-
-    ind_WL = np.abs(thredds_time_WL - t).argmin()
-    ind_Tp = np.abs(thredds_time_Tp - t).argmin()
-
-    # Peak period
-    Tp = int(np.ceil(wave_Tp[ind_Tp]))
-
-    # Water level
-    WL = round(waterlevel[ind_WL], 2)
-
-    return Tp, WL
 
 
 """

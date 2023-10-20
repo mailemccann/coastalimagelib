@@ -1,13 +1,14 @@
 import sys
 import imageio
 import numpy as np
-import cv2 as cv
 from math import sin, cos
 from scipy.interpolate import RegularGridInterpolator as reg_interp
 from scipy.ndimage.morphology import distance_transform_edt
 from skimage.exposure import match_histograms
 from supportfunctions import initFullFileName, localTransformPoints
 import matplotlib.pyplot as plt
+from skimage.io import imsave, imread
+from skimage import color
 
 
 """
@@ -135,8 +136,7 @@ def dlt2UV(grid, cal):
 def matchHist(ref, image):
     """
 
-    Trying Chris Sherwood's method if using an RBG image
-    Note: usually working with BW for Argus stuff so far
+    Chris Sherwood's method if using an RBG image
 
     Matches the histogram of an input image to a reference
     image saved in self in order to better blend seams
@@ -153,8 +153,8 @@ def matchHist(ref, image):
 
     if (len(image.shape) > 2) & (image.shape[2] > 1):
         # Convert to hsv space
-        im_hsv = cv.cvtColor(image, cv.COLOR_RGB2HSV)
-        ref_hsv = cv.cvtColor(ref, cv.COLOR_RGB2HSV)
+        im_hsv = color.rgb2hsv(image)
+        ref_hsv = color.rgb2hsv(ref)
 
         # Match histogram to reference hist on only v channel
         matched_v = match_histograms(
@@ -165,10 +165,10 @@ def matchHist(ref, image):
         # Then, convert back to RGB
         matched_hsv = im_hsv.copy()
         matched_hsv[:, :, 2] = matched_v
-        matched = cv.cvtColor(matched_hsv, cv.COLOR_HSV2RGB)
+        matched = color.hsv2rgb(matched_hsv)
     else:
         if (len(ref.shape) > 2) & (ref.shape[2] > 1):
-            ref = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+            ref = color.rgb2gray(image)
 
         matched = match_histograms(image, ref, multichannel=False)
     return matched
@@ -386,6 +386,7 @@ def rectVideos(video_list, cameras, grid, numFrames, savefps = 'None'):
         rect_array: h x w x numFrames array of rectified frames
 
     """
+    import cv2 as cv
 
     caps = []
     nc = 3
@@ -586,10 +587,10 @@ def imageStats(im_mat, save_flag=0, disp_flag=0):
     Variance = np.uint8(np.nanstd(im_mat, axis=2))
 
     if save_flag:
-        cv.imwrite("Darkest.jpg", Dark)
-        cv.imwrite("Brightest.jpg", Bright)
-        cv.imwrite("Timex.jpg", Timex)
-        cv.imwrite("Variance.jpg", Variance)
+        imsave("Darkest.jpg", Dark)
+        imsave("Brightest.jpg", Bright)
+        imsave("Timex.jpg", Timex)
+        imsave("Variance.jpg", Variance)
 
     if disp_flag:
         fig, axs = plt.subplots(1, 4)
