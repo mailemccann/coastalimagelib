@@ -747,7 +747,7 @@ class CameraData(object):
                       will be considered the local working coordinate system.'
             )
         if (self.coords == "geo") & (origin != "None"):
-            self.local_extrinsics = self.localTranformExtrinsics()
+            self.local_extrinsics = self.localTransformExtrinsics()
         if mType != "DLT":
             self.P, self.K, self.R, self.IC = self.getMatrices()
 
@@ -814,7 +814,7 @@ class CameraData(object):
 
         return P, K, R, IC
 
-    def localTranformExtrinsics(self):
+    def localTransformExtrinsics(self):
 
         """
         Transforms extrinsics in local coordinates to geo, or extrinsics
