@@ -171,7 +171,7 @@ def matchHist(ref, image):
             ref = color.rgb2gray(image)
 
         matched = match_histograms(image, ref, multichannel=False)
-    return matched
+    return np.uint8(matched*255)
 
 
 def getPixels(image, Ud, Vd, s):
@@ -328,7 +328,7 @@ def mergeRectify(input_frames, cameras, grid):
         # Determine if the user provided a filepath or image
         if isinstance(I, str):
             # Load image from current camera
-            image = imageio.imread(I)
+            image = imageio.v2.imread(I)
         else:
             image = input_frames[:, :, (k * nc): (k * nc + nc)]
 
@@ -504,7 +504,7 @@ def pixelStack(frames, grid, cameras, disp_flag=0):
         else:
             image = frames[:, :, (k * nc): (k * nc + nc)]
 
-        # Match histograms
+        # Match histograms, init plot
         if k == 0:
             ref = image
         else:

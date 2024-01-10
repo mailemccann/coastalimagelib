@@ -1,5 +1,4 @@
 import numpy as np
-import cv2 as cv
 
 """
 Supporting Functions:
@@ -33,10 +32,6 @@ Supporting Functions:
     estSharpness
 
     avgColor
-
-    ******convert to rgb from grayscale
-
-    *******convert to hsv from rgb
 
 """
 
@@ -278,6 +273,8 @@ def estSharpness(img):
     https://stackoverflow.com/questions/6646371/detect-which-image-is-sharper
 
     """
+    import cv2 as cv
+
     array = np.asarray(cv.cvtColor(img, cv.COLOR_BGR2GRAY), dtype=np.int32)
     contrast = array.std()
     gy, gx = np.gradient(array)
